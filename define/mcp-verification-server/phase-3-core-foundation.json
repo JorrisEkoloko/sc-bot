@@ -1,0 +1,273 @@
+{
+  "phase": "Phase 3: Core Foundation (Week 1)",
+  "purpose": "Implement and verify the 6 core components that form the system foundation",
+  "duration": "5-7 days",
+  "components": [
+    "TelegramMonitor",
+    "MessageProcessor",
+    "AddressExtractor",
+    "PriceEngine",
+    "PerformanceTracker",
+    "DataOutput"
+  ],
+
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions before implementing any component",
+    "questions": [
+      {
+        "id": "Q3.1",
+        "question": "Which current file contains the Telegram client implementation?",
+        "expected_answer": "src/telegram/client.py (CryptoTelegramClient)",
+        "verification": "Must know source of functionality to preserve",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q3.2",
+        "question": "What library is used for Telegram integration?",
+        "expected_answer": "Telethon",
+        "verification": "Must preserve same library",
+        "reference": "src/telegram/client.py"
+      },
+      {
+        "id": "Q3.3",
+        "question": "What are the exact HDRB formula weights?",
+        "expected_answer": "Engagement 40%, Relevance 25%, Signal 20%, Timing 15%",
+        "verification": "Must preserve exact weights",
+        "reference": "src/scoring/research_based_scorer.py"
+      },
+      {
+        "id": "Q3.4",
+        "question": "What regex pattern is used for Ethereum addresses?",
+        "expected_answer": "0x[a-fA-F0-9]{40}",
+        "verification": "Must preserve exact pattern",
+        "reference": "src/extraction/address_extractor.py"
+      },
+      {
+        "id": "Q3.5",
+        "question": "What is the API failover sequence?",
+        "expected_answer": "CoinGecko → DexScreener → Moralis → Etherscan → Birdeye → DeFiLlama",
+        "verification": "Must preserve exact sequence",
+        "reference": "src/price/price_fetcher.py"
+      },
+      {
+        "id": "Q3.6",
+        "question": "What is the cache TTL for price data?",
+        "expected_answer": "5 minutes (300 seconds)",
+        "verification": "Must preserve caching strategy",
+        "reference": "src/price/price_fetcher.py"
+      },
+      {
+        "id": "Q3.7",
+        "question": "What is the ATH detection threshold?",
+        "expected_answer": "1% minimum threshold",
+        "verification": "Must preserve exact threshold",
+        "reference": "src/tracking/ath_tracker.py"
+      },
+      {
+        "id": "Q3.8",
+        "question": "What is the FIFO cleanup trigger percentage?",
+        "expected_answer": "95% of max capacity (1000 tokens)",
+        "verification": "Must preserve cleanup logic",
+        "reference": "src/tracking/ath_tracker.py"
+      },
+      {
+        "id": "Q3.9",
+        "question": "How many columns are in the output format?",
+        "expected_answer": "37 columns (21 base + 13 API + 3 enhanced)",
+        "verification": "Must preserve exact format",
+        "reference": "src/output/fixed_data_writer.py"
+      },
+      {
+        "id": "Q3.10",
+        "question": "What authentication methods are supported for Google Sheets?",
+        "expected_answer": "OAuth2 and Service Account",
+        "verification": "Must preserve both methods",
+        "reference": "src/output/data_writer.py"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Review component implementation guides before proceeding"
+  },
+
+  "component_verification": {
+    "telegram_monitor": {
+      "pre_implementation_checks": [
+        "Have you read src/telegram/client.py completely?",
+        "Do you understand the authentication flow?",
+        "Do you know how multi-channel monitoring works?",
+        "Have you identified all methods to preserve?"
+      ],
+      "implementation_verification": [
+        "Does it use Telethon library?",
+        "Does it handle authentication (phone + 2FA)?",
+        "Does it support multi-channel monitoring?",
+        "Does it have message queuing?",
+        "Does it validate channel access?"
+      ],
+      "post_implementation_validation": [
+        "Can connect to Telegram successfully?",
+        "Can authenticate with credentials?",
+        "Can access configured channels?",
+        "Can receive messages in queue?",
+        "Does session management work?"
+      ],
+      "reference": "define/core-components/telegram-monitor-implementation.md"
+    },
+    "message_processor": {
+      "pre_implementation_checks": [
+        "Have you read src/scoring/research_based_scorer.py?",
+        "Do you understand the HDRB formula exactly?",
+        "Do you know the weight distribution?",
+        "Have you identified crypto detection patterns?"
+      ],
+      "implementation_verification": [
+        "Is HDRB formula exactly: IC = retweet + (2 × favorite) + (0.5 × reply)?",
+        "Are weights exactly: 40%, 25%, 20%, 15%?",
+        "Does it handle Telegram fallback mapping?",
+        "Does it integrate intelligence scoring?",
+        "Does it calculate holistic confidence?"
+      ],
+      "post_implementation_validation": [
+        "Does HDRB scoring match current implementation?",
+        "Are crypto patterns detected correctly?",
+        "Is sentiment analysis working?",
+        "Is confidence calculation accurate?",
+        "Do test messages score correctly?"
+      ],
+      "reference": "define/core-components/message-processor-implementation.md"
+    },
+    "address_extractor": {
+      "pre_implementation_checks": [
+        "Have you read src/extraction/address_extractor.py?",
+        "Do you know the Ethereum regex pattern?",
+        "Do you understand Solana Base58 validation?",
+        "Have you identified deduplication logic?"
+      ],
+      "implementation_verification": [
+        "Is Ethereum pattern exactly: 0x[a-fA-F0-9]{40}?",
+        "Does Solana validation use Base58?",
+        "Is checksum validation implemented for Ethereum?",
+        "Does deduplication work correctly?",
+        "Is confidence scoring implemented?"
+      ],
+      "post_implementation_validation": [
+        "Can extract Ethereum addresses correctly?",
+        "Can extract Solana addresses correctly?",
+        "Does validation catch invalid addresses?",
+        "Does deduplication prevent duplicates?",
+        "Is confidence scoring accurate?"
+      ],
+      "reference": "define/core-components/address-extractor-implementation.md"
+    },
+    "price_engine": {
+      "pre_implementation_checks": [
+        "Have you read src/price/price_fetcher.py?",
+        "Do you know all 6 APIs?",
+        "Do you understand the failover sequence?",
+        "Have you identified rate limiting logic?"
+      ],
+      "implementation_verification": [
+        "Are all 6 APIs integrated (CoinGecko, DexScreener, Moralis, Etherscan, Birdeye, DeFiLlama)?",
+        "Is failover sequence correct?",
+        "Is rate limiting per-API implemented?",
+        "Are circuit breakers per-API implemented?",
+        "Is 5-minute cache TTL implemented?"
+      ],
+      "post_implementation_validation": [
+        "Can fetch prices from all 6 APIs?",
+        "Does failover work when APIs fail?",
+        "Does rate limiting prevent overuse?",
+        "Do circuit breakers trip on failures?",
+        "Does caching reduce API calls?"
+      ],
+      "reference": "define/core-components/price-engine-implementation.md"
+    },
+    "performance_tracker": {
+      "pre_implementation_checks": [
+        "Have you read src/tracking/ath_tracker.py?",
+        "Do you understand the 7-day tracking period?",
+        "Do you know the 2-hour update interval?",
+        "Have you identified ROI calculation logic?"
+      ],
+      "implementation_verification": [
+        "Is tracking period exactly 168 hours (7 days)?",
+        "Is update interval exactly 2 hours?",
+        "Is ATH threshold exactly 1%?",
+        "Is max tokens exactly 1000?",
+        "Is FIFO cleanup at 95% capacity?",
+        "Is ROI calculation correct?"
+      ],
+      "post_implementation_validation": [
+        "Can start tracking tokens?",
+        "Does 2-hour update cycle work?",
+        "Does ATH detection work (1% threshold)?",
+        "Does ROI calculation match current?",
+        "Does FIFO cleanup trigger correctly?",
+        "Does channel reputation update?"
+      ],
+      "reference": "define/core-components/performance-tracker-implementation.md"
+    },
+    "data_output": {
+      "pre_implementation_checks": [
+        "Have you read src/output/fixed_data_writer.py?",
+        "Do you know the exact column count (37)?",
+        "Do you understand OAuth2 and Service Account auth?",
+        "Have you identified mini-table logic?"
+      ],
+      "implementation_verification": [
+        "Are there exactly 37 columns (21 base + 13 API + 3 enhanced)?",
+        "Does it support both OAuth2 and Service Account?",
+        "Does it write to both CSV and Google Sheets?",
+        "Does it have conditional formatting?",
+        "Does it generate mini-tables?",
+        "Does CSV fallback work?"
+      ],
+      "post_implementation_validation": [
+        "Can write to CSV successfully?",
+        "Can write to Google Sheets successfully?",
+        "Are all 37 columns present?",
+        "Does conditional formatting apply?",
+        "Do mini-tables generate correctly?",
+        "Does fallback work when Sheets fails?"
+      ],
+      "reference": "define/core-components/data-output-implementation.md"
+    }
+  },
+
+  "validation_checklist": {
+    "all_components_implemented": [
+      "TelegramMonitor - Complete and tested",
+      "MessageProcessor - Complete and tested",
+      "AddressExtractor - Complete and tested",
+      "PriceEngine - Complete and tested",
+      "PerformanceTracker - Complete and tested",
+      "DataOutput - Complete and tested"
+    ],
+    "functionality_preserved": [
+      "Telegram connection works same as current",
+      "HDRB scoring matches current exactly",
+      "Address extraction has same accuracy",
+      "All 6 APIs work with same failover",
+      "ATH tracking behaves identically",
+      "Output format matches current (37 columns)"
+    ],
+    "integration_verified": [
+      "Components can communicate",
+      "Data flows correctly between components",
+      "Error handling works",
+      "Performance is acceptable"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "All 6 components implemented",
+      "All component verifications passed",
+      "All post-implementation validations passed",
+      "All validation checklist items complete"
+    ],
+    "on_pass": "Proceed to Phase 4: Intelligence Layer",
+    "on_fail": "Fix failing components before proceeding"
+  }
+}

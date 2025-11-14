@@ -1,0 +1,60 @@
+[2025-11-10 17:35:38] [INFO] [TestTask4] ============================================================
+[2025-11-10 17:35:38] [INFO] [TestTask4] Testing Task 4: Multi-Table Data Output
+[2025-11-10 17:35:38] [INFO] [TestTask4] ============================================================
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+1. Initializing MultiTableDataOutput...
+[2025-11-10 17:35:38] [INFO] [TestTask4] Multi-table data output initialized (CSV: output_test, Sheets: False)
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ MultiTableDataOutput initialized
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+2. Testing MESSAGES table (append-only)...
+[2025-11-10 17:35:38] [INFO] [TestTask4] Created new CSV file: output_test\2025-11-10\messages.csv
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ Message written to MESSAGES table
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+3. Testing TOKEN_PRICES table (update-or-insert)...
+[2025-11-10 17:35:38] [INFO] [TestTask4] Created new CSV file: output_test\2025-11-10\token_prices.csv
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ Token price written to TOKEN_PRICES table
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+4. Testing PERFORMANCE table (update-or-insert)...
+[2025-11-10 17:35:38] [INFO] [TestTask4] Created new CSV file: output_test\2025-11-10\performance.csv
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ Performance written to PERFORMANCE table
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+5. Testing HISTORICAL table (update-or-insert)...
+[2025-11-10 17:35:38] [INFO] [TestTask4] Created new CSV file: output_test\2025-11-10\historical.csv
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ Historical data written to HISTORICAL table
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+6. Testing update-or-insert logic...
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ Token price updated (should update existing row, not duplicate)
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+7. Checking statistics...
+[2025-11-10 17:35:38] [INFO] [TestTask4] Statistics: {'messages_written': 1, 'token_prices_written': 2, 'performance_written': 1, 'historical_written': 1, 'csv_errors': 0, 'sheets_errors': 0}
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+8. Verifying CSV files...
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ messages.csv exists
+[2025-11-10 17:35:38] [INFO] [TestTask4]   Rows: 1
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ token_prices.csv exists
+[2025-11-10 17:35:38] [INFO] [TestTask4]   Rows: 1
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ performance.csv exists
+[2025-11-10 17:35:38] [INFO] [TestTask4]   Rows: 1
+[2025-11-10 17:35:38] [INFO] [TestTask4] ✓ historical.csv exists
+[2025-11-10 17:35:38] [INFO] [TestTask4]   Rows: 1
+[2025-11-10 17:35:38] [INFO] [TestTask4] Data output closed. Stats: {'messages_written': 1, 'token_prices_written': 2, 'performance_written': 1, 'historical_written': 1, 'csv_errors': 0, 'sheets_errors': 0}
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+============================================================
+[2025-11-10 17:35:38] [INFO] [TestTask4] Task 4 Test Complete!
+[2025-11-10 17:35:38] [INFO] [TestTask4] ============================================================
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+CSV files location: output_test\2025-11-10
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+Next steps:
+[2025-11-10 17:35:38] [INFO] [TestTask4] 1. Review CSV files in output_test/YYYY-MM-DD/
+[2025-11-10 17:35:38] [INFO] [TestTask4] 2. Verify MESSAGES table has 1 row
+[2025-11-10 17:35:38] [INFO] [TestTask4] 3. Verify TOKEN_PRICES table has 1 row (updated, not 2)
+[2025-11-10 17:35:38] [INFO] [TestTask4] 4. Verify PERFORMANCE table has 1 row
+[2025-11-10 17:35:38] [INFO] [TestTask4] 5. Verify HISTORICAL table has 1 row
+[2025-11-10 17:35:38] [INFO] [TestTask4] 
+To enable Google Sheets:
+[2025-11-10 17:35:38] [INFO] [TestTask4] 1. Create service account at https://console.cloud.google.com/
+[2025-11-10 17:35:38] [INFO] [TestTask4] 2. Download credentials JSON to credentials/
+[2025-11-10 17:35:38] [INFO] [TestTask4] 3. Create spreadsheet and get ID from URL
+[2025-11-10 17:35:38] [INFO] [TestTask4] 4. Share spreadsheet with service account email
+[2025-11-10 17:35:38] [INFO] [TestTask4] 5. Update .env with credentials path and spreadsheet ID

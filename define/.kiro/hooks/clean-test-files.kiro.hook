@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Clean Test Files After Implementation",
+  "description": "Automatically detect and remove temporary test files, example scripts, and validation scripts after implementation is complete, keeping the codebase clean and production-ready",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A file has been saved in the crypto-intelligence directory. Scan the crypto-intelligence directory for temporary test and development files that should be removed to keep the codebase production-ready. Look for and identify files matching these patterns:\n\n- Files starting with test_ (e.g., test_config.py, test_telegram.py)\n- Files starting with example_ (e.g., example_usage.py)\n- Files starting with validate_ (e.g., validate_setup.py)\n- Files starting with verify_ (e.g., verify_connection.py)\n- Files ending with _test.py or _example.py\n- Files named scratch.py, temp.py, or debug.py\n\nFor each file found:\n1. Confirm it appears to be a temporary test/validation file (not a core component)\n2. Check if it's safe to remove (not referenced by production code)\n3. Delete the file if appropriate\n4. Report what was cleaned up\n\nBe cautious and only remove files that are clearly temporary development artifacts, not legitimate test suites or example documentation that should be preserved."
+  }
+}

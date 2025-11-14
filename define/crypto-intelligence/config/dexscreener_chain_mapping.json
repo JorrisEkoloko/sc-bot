@@ -1,0 +1,167 @@
+{
+  "_comment": "DexScreener Chain ID Mapping - Maps generic chain names to DexScreener-specific chain IDs",
+  "_source": "https://dexscreener.com and API responses",
+  "_updated": "2025-11-11",
+
+  "mappings": {
+    "evm": "ethereum",
+    "eth": "ethereum",
+    "ethereum": "ethereum",
+
+    "bsc": "bsc",
+    "bnb": "bsc",
+    "binance": "bsc",
+
+    "polygon": "polygon",
+    "matic": "polygon",
+
+    "arbitrum": "arbitrum",
+    "arb": "arbitrum",
+
+    "optimism": "optimism",
+    "op": "optimism",
+
+    "avalanche": "avalanche",
+    "avax": "avalanche",
+
+    "fantom": "fantom",
+    "ftm": "fantom",
+
+    "cronos": "cronos",
+    "cro": "cronos",
+
+    "base": "base",
+
+    "solana": "solana",
+    "sol": "solana",
+
+    "pulsechain": "pulsechain",
+    "pls": "pulsechain",
+
+    "linea": "linea",
+
+    "scroll": "scroll",
+
+    "zksync": "zksync",
+
+    "celo": "celo",
+
+    "aptos": "aptos",
+    "apt": "aptos",
+
+    "sui": "sui",
+
+    "hyperevm": "hyperevm",
+    "hype": "hyperevm",
+
+    "blast": "blast",
+
+    "mantle": "mantle",
+    "mnt": "mantle",
+
+    "metis": "metis",
+
+    "moonbeam": "moonbeam",
+    "glmr": "moonbeam",
+
+    "moonriver": "moonriver",
+    "movr": "moonriver",
+
+    "kava": "kava",
+
+    "aurora": "aurora",
+
+    "harmony": "harmony",
+    "one": "harmony",
+
+    "gnosis": "gnosis",
+    "xdai": "gnosis",
+
+    "fuse": "fuse",
+
+    "evmos": "evmos",
+
+    "boba": "boba",
+
+    "canto": "canto",
+
+    "dogechain": "dogechain",
+
+    "klaytn": "klaytn",
+    "klay": "klaytn",
+
+    "oasis": "oasis",
+
+    "velas": "velas",
+    "vlx": "velas",
+
+    "telos": "telos",
+    "tlos": "telos",
+
+    "thundercore": "thundercore",
+    "tt": "thundercore",
+
+    "smartbch": "smartbch",
+
+    "elastos": "elastos",
+    "ela": "elastos",
+
+    "wanchain": "wanchain",
+    "wan": "wanchain",
+
+    "heco": "heco",
+    "ht": "heco",
+
+    "okc": "okc",
+    "okt": "okc",
+
+    "polygon_zkevm": "polygon_zkevm",
+    "zkevm": "polygon_zkevm",
+
+    "arbitrum_nova": "arbitrum_nova",
+
+    "flare": "flare",
+    "flr": "flare",
+
+    "songbird": "songbird",
+    "sgb": "songbird",
+
+    "syscoin": "syscoin",
+    "sys": "syscoin",
+
+    "milkomeda": "milkomeda",
+
+    "astar": "astar",
+
+    "shiden": "shiden",
+
+    "kardia": "kardia",
+    "kai": "kardia",
+
+    "iotex": "iotex",
+    "iotx": "iotex",
+
+    "conflux": "conflux",
+    "cfx": "conflux",
+
+    "meter": "meter",
+    "mtrg": "meter",
+
+    "rsk": "rsk",
+    "rootstock": "rsk",
+
+    "energi": "energi",
+    "nrg": "energi",
+
+    "gochain": "gochain",
+    "go": "gochain"
+  },
+
+  "default": "ethereum",
+
+  "notes": {
+    "evm_chains": "Most EVM-compatible chains default to 'ethereum' if not explicitly mapped",
+    "case_insensitive": "All lookups should be case-insensitive",
+    "fallback": "If chain not found in mapping, use the chain name as-is (lowercase)"
+  }
+}

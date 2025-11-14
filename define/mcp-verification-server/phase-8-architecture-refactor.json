@@ -1,0 +1,514 @@
+{
+  "phase": "8",
+  "name": "Architecture Refactoring",
+  "description": "Systematic refactoring to clean layered architecture with verification at each step",
+  "pre_phase_questionnaire": {
+    "required_score": "10/10",
+    "questions": [
+      {
+        "id": "Q1",
+        "question": "What are the 5 core layers in the target architecture?",
+        "expected_answer": "domain, repositories, services, infrastructure, utils/config"
+      },
+      {
+        "id": "Q2",
+        "question": "Why should API clients be in repositories layer, not core?",
+        "expected_answer": "API clients are data access mechanisms (repositories), not business logic"
+      },
+      {
+        "id": "Q3",
+        "question": "What is the Single Responsibility Principle violation in current core layer?",
+        "expected_answer": "Core contains business logic (sentiment_analyzer, hdrb_scorer) that should be in services"
+      },
+      {
+        "id": "Q4",
+        "question": "What is the dependency flow direction in layered architecture?",
+        "expected_answer": "Upper layers depend on lower layers, never reverse: infrastructure -> services -> repositories -> domain"
+      },
+      {
+        "id": "Q5",
+        "question": "Why extract domain models into separate layer?",
+        "expected_answer": "Domain models are pure data structures with no dependencies, shared across all layers"
+      },
+      {
+        "id": "Q6",
+        "question": "What's the difference between a service and a repository?",
+        "expected_answer": "Services contain business logic and orchestration; repositories handle data access only"
+      },
+      {
+        "id": "Q7",
+        "question": "Why is reputation_engine.py problematic?",
+        "expected_answer": "It mixes data persistence (file I/O) with business logic (reputation calculation)"
+      },
+      {
+        "id": "Q8",
+        "question": "What migration strategy ensures system keeps working?",
+        "expected_answer": "Incremental migration: create new structure, move files gradually, update imports, verify at each step"
+      },
+      {
+        "id": "Q9",
+        "question": "How should cross-layer imports be structured?",
+        "expected_answer": "Use absolute imports from project root (from domain.price_data import PriceData)"
+      },
+      {
+        "id": "Q10",
+        "question": "What must be verified after each migration step?",
+        "expected_answer": "All imports resolve, no circular dependencies, tests pass, system runs"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "step": "1",
+      "name": "Create New Folder Structure",
+      "description": "Create all new folders without moving any files yet",
+      "tasks": [
+        "Create domain/ folder with __init__.py",
+        "Create repositories/ with subfolders: api_clients/, file_storage/, writers/",
+        "Create services/ with subfolders: message_processing/, analytics/, pricing/, tracking/, reputation/",
+        "Create infrastructure/ with subfolders: telegram/, output/, scrapers/",
+        "Add __init__.py to all new folders"
+      ],
+      "verification": {
+        "folder_exists": [
+          "crypto-intelligence/domain",
+          "crypto-intelligence/repositories",
+          "crypto-intelligence/repositories/api_clients",
+          "crypto-intelligence/repositories/file_storage",
+          "crypto-intelligence/repositories/writers",
+          "crypto-intelligence/services",
+          "crypto-intelligence/services/message_processing",
+          "crypto-intelligence/services/analytics",
+          "crypto-intelligence/services/pricing",
+          "crypto-intelligence/services/tracking",
+          "crypto-intelligence/services/reputation",
+          "crypto-intelligence/infrastructure",
+          "crypto-intelligence/infrastructure/telegram",
+          "crypto-intelligence/infrastructure/output",
+          "crypto-intelligence/infrastructure/scrapers"
+        ],
+        "init_files_exist": [
+          "crypto-intelligence/domain/__init__.py",
+          "crypto-intelligence/repositories/__init__.py",
+          "crypto-intelligence/repositories/api_clients/__init__.py",
+          "crypto-intelligence/repositories/file_storage/__init__.py",
+          "crypto-intelligence/repositories/writers/__init__.py",
+          "crypto-intelligence/services/__init__.py",
+          "crypto-intelligence/services/message_processing/__init__.py",
+          "crypto-intelligence/services/analytics/__init__.py",
+          "crypto-intelligence/services/pricing/__init__.py",
+          "crypto-intelligence/services/tracking/__init__.py",
+          "crypto-intelligence/services/reputation/__init__.py",
+          "crypto-intelligence/infrastructure/__init__.py",
+          "crypto-intelligence/infrastructure/telegram/__init__.py",
+          "crypto-intelligence/infrastructure/output/__init__.py",
+          "crypto-intelligence/infrastructure/scrapers/__init__.py"
+        ]
+      },
+      "success_criteria": [
+        "All folders created",
+        "All __init__.py files present",
+        "No files moved yet (non-breaking change)",
+        "System still runs normally"
+      ]
+    },
+    {
+      "step": "2",
+      "name": "Extract Domain Models",
+      "description": "Create pure domain models with no dependencies",
+      "tasks": [
+        "Create domain/price_data.py (extract from api_clients/base_client.py)",
+        "Create domain/signal_outcome.py (move from intelligence/)",
+        "Create domain/channel_reputation.py (move from intelligence/)",
+        "Create domain/message_event.py (extract from telegram_monitor.py)",
+        "Update domain/__init__.py with exports"
+      ],
+      "verification": {
+        "files_exist": [
+          "crypto-intelligence/domain/price_data.py",
+          "crypto-intelligence/domain/signal_outcome.py",
+          "crypto-intelligence/domain/channel_reputation.py",
+          "crypto-intelligence/domain/message_event.py"
+        ],
+        "no_external_dependencies": true,
+        "dataclasses_only": true,
+        "exports_in_init": [
+          "PriceData",
+          "SignalOutcome",
+          "ChannelReputation",
+          "MessageEvent"
+        ]
+      },
+      "success_criteria": [
+        "Domain models are pure dataclasses",
+        "No business logic in domain models",
+        "No imports except typing and dataclasses",
+        "All models exported in __init__.py"
+      ]
+    },
+    {
+      "step": "3",
+      "name": "Move API Clients to Repositories",
+      "description": "Relocate API clients from core to repositories layer",
+      "tasks": [
+        "Copy core/api_clients/* to repositories/api_clients/",
+        "Update base_client.py to import from domain.price_data",
+        "Update all client imports to use domain models",
+        "Update repositories/api_clients/__init__.py",
+        "Verify no breaking changes to existing code"
+      ],
+      "verification": {
+        "files_moved": [
+          "repositories/api_clients/base_client.py",
+          "repositories/api_clients/coingecko_client.py",
+          "repositories/api_clients/birdeye_client.py",
+          "repositories/api_clients/moralis_client.py",
+          "repositories/api_clients/dexscreener_client.py",
+          "repositories/api_clients/cryptocompare_client.py",
+          "repositories/api_clients/defillama_client.py",
+          "repositories/api_clients/twelvedata_client.py"
+        ],
+        "imports_updated": true,
+        "no_circular_dependencies": true
+      },
+      "success_criteria": [
+        "All API clients in repositories/api_clients/",
+        "All imports use domain.price_data",
+        "Old core/api_clients/ still exists (backward compatibility)",
+        "System runs without errors"
+      ]
+    },
+    {
+      "step": "4",
+      "name": "Create File Storage Repositories",
+      "description": "Extract pure data access from intelligence layer",
+      "tasks": [
+        "Move intelligence/outcome_repository.py to repositories/file_storage/",
+        "Create repositories/file_storage/reputation_repository.py (extract from reputation_engine.py)",
+        "Create repositories/file_storage/tracking_repository.py (extract from performance_tracker.py)",
+        "Update all repositories to use domain models",
+        "Ensure repositories have ZERO business logic"
+      ],
+      "verification": {
+        "files_exist": [
+          "repositories/file_storage/outcome_repository.py",
+          "repositories/file_storage/reputation_repository.py",
+          "repositories/file_storage/tracking_repository.py"
+        ],
+        "no_business_logic": true,
+        "only_crud_operations": true,
+        "uses_domain_models": true
+      },
+      "success_criteria": [
+        "All file repositories in repositories/file_storage/",
+        "Only CRUD operations (save, load, delete)",
+        "No calculations or business rules",
+        "All use domain models"
+      ]
+    },
+    {
+      "step": "5",
+      "name": "Move Output Writers to Repositories",
+      "description": "Relocate CSV and Sheets writers to repositories layer",
+      "tasks": [
+        "Move core/csv_table_writer.py to repositories/writers/csv_writer.py",
+        "Move core/sheets_multi_table.py to repositories/writers/sheets_writer.py",
+        "Update imports in both files",
+        "Update repositories/writers/__init__.py"
+      ],
+      "verification": {
+        "files_moved": [
+          "repositories/writers/csv_writer.py",
+          "repositories/writers/sheets_writer.py"
+        ],
+        "imports_updated": true
+      },
+      "success_criteria": [
+        "Writers in repositories/writers/",
+        "All imports resolved",
+        "Old files still exist for backward compatibility"
+      ]
+    },
+    {
+      "step": "6",
+      "name": "Move Analytics Services",
+      "description": "Relocate business logic to services/analytics/",
+      "tasks": [
+        "Move core/sentiment_analyzer.py to services/analytics/",
+        "Move core/hdrb_scorer.py to services/analytics/",
+        "Move intelligence/market_analyzer.py to services/analytics/",
+        "Update all imports to use domain models and repositories",
+        "Update services/analytics/__init__.py"
+      ],
+      "verification": {
+        "files_moved": [
+          "services/analytics/sentiment_analyzer.py",
+          "services/analytics/hdrb_scorer.py",
+          "services/analytics/market_analyzer.py"
+        ],
+        "imports_updated": true,
+        "no_data_access": true
+      },
+      "success_criteria": [
+        "All analytics in services/analytics/",
+        "Services use repositories for data access",
+        "No direct file I/O in services",
+        "All imports resolved"
+      ]
+    },
+    {
+      "step": "7",
+      "name": "Move Message Processing Services",
+      "description": "Relocate message processing to services layer",
+      "tasks": [
+        "Move core/message_processor.py to services/message_processing/",
+        "Move core/address_extractor.py to services/message_processing/",
+        "Move core/crypto_detector.py to services/message_processing/",
+        "Update imports",
+        "Update services/message_processing/__init__.py"
+      ],
+      "verification": {
+        "files_moved": [
+          "services/message_processing/message_processor.py",
+          "services/message_processing/address_extractor.py",
+          "services/message_processing/crypto_detector.py"
+        ],
+        "imports_updated": true
+      },
+      "success_criteria": [
+        "All message processing in services/message_processing/",
+        "Services orchestrate business logic",
+        "All imports resolved"
+      ]
+    },
+    {
+      "step": "8",
+      "name": "Move Pricing Services",
+      "description": "Relocate pricing logic to services layer",
+      "tasks": [
+        "Move core/price_engine.py to services/pricing/",
+        "Move core/data_enrichment_service.py to services/pricing/data_enrichment.py",
+        "Update imports to use repositories/api_clients",
+        "Update services/pricing/__init__.py"
+      ],
+      "verification": {
+        "files_moved": [
+          "services/pricing/price_engine.py",
+          "services/pricing/data_enrichment.py"
+        ],
+        "uses_repositories": true,
+        "imports_updated": true
+      },
+      "success_criteria": [
+        "Pricing services in services/pricing/",
+        "Uses repositories for API access",
+        "All imports resolved"
+      ]
+    },
+    {
+      "step": "9",
+      "name": "Move Tracking Services",
+      "description": "Relocate tracking logic to services layer",
+      "tasks": [
+        "Move core/performance_tracker.py to services/tracking/",
+        "Move intelligence/outcome_tracker.py to services/tracking/",
+        "Update to use repositories for data access",
+        "Update services/tracking/__init__.py"
+      ],
+      "verification": {
+        "files_moved": [
+          "services/tracking/performance_tracker.py",
+          "services/tracking/outcome_tracker.py"
+        ],
+        "uses_repositories": true,
+        "imports_updated": true
+      },
+      "success_criteria": [
+        "Tracking services in services/tracking/",
+        "Uses repositories for persistence",
+        "All imports resolved"
+      ]
+    },
+    {
+      "step": "10",
+      "name": "Move Reputation Services",
+      "description": "Relocate reputation logic to services layer",
+      "tasks": [
+        "Move intelligence/reputation_engine.py to services/reputation/ (logic only)",
+        "Move intelligence/reputation_calculator.py to services/reputation/",
+        "Move intelligence/roi_calculator.py to services/reputation/",
+        "Update to use repositories/file_storage/reputation_repository",
+        "Update services/reputation/__init__.py"
+      ],
+      "verification": {
+        "files_moved": [
+          "services/reputation/reputation_engine.py",
+          "services/reputation/reputation_calculator.py",
+          "services/reputation/roi_calculator.py"
+        ],
+        "uses_repositories": true,
+        "no_file_io": true,
+        "imports_updated": true
+      },
+      "success_criteria": [
+        "Reputation services in services/reputation/",
+        "Uses ReputationRepository for data access",
+        "No direct file I/O",
+        "All imports resolved"
+      ]
+    },
+    {
+      "step": "11",
+      "name": "Move Infrastructure Components",
+      "description": "Relocate external integrations to infrastructure layer",
+      "tasks": [
+        "Move core/telegram_monitor.py to infrastructure/telegram/",
+        "Move core/data_output.py to infrastructure/output/",
+        "Move core/historical_scraper.py to infrastructure/scrapers/",
+        "Update imports",
+        "Update infrastructure/__init__.py files"
+      ],
+      "verification": {
+        "files_moved": [
+          "infrastructure/telegram/telegram_monitor.py",
+          "infrastructure/output/data_output.py",
+          "infrastructure/scrapers/historical_scraper.py"
+        ],
+        "imports_updated": true
+      },
+      "success_criteria": [
+        "Infrastructure components properly located",
+        "All imports resolved",
+        "System still functional"
+      ]
+    },
+    {
+      "step": "12",
+      "name": "Update Main Orchestrator",
+      "description": "Update main.py to use new architecture",
+      "tasks": [
+        "Update all imports in main.py to use new paths",
+        "Verify dependency injection still works",
+        "Test system startup",
+        "Verify all components initialize correctly"
+      ],
+      "verification": {
+        "imports_updated": true,
+        "system_starts": true,
+        "no_import_errors": true,
+        "all_components_initialize": true
+      },
+      "success_criteria": [
+        "main.py uses new import paths",
+        "System starts without errors",
+        "All components accessible",
+        "Dependency flow correct"
+      ]
+    },
+    {
+      "step": "13",
+      "name": "Update All Cross-References",
+      "description": "Update imports throughout codebase",
+      "tasks": [
+        "Search for all imports from old locations",
+        "Update to new architecture paths",
+        "Verify no circular dependencies",
+        "Run import validation"
+      ],
+      "verification": {
+        "no_old_imports": true,
+        "no_circular_dependencies": true,
+        "all_imports_resolve": true
+      },
+      "success_criteria": [
+        "All imports use new paths",
+        "No references to old locations",
+        "Dependency graph is acyclic",
+        "All modules importable"
+      ]
+    },
+    {
+      "step": "14",
+      "name": "Run Full System Tests",
+      "description": "Verify system functionality after refactoring",
+      "tasks": [
+        "Run all existing tests",
+        "Test message processing flow",
+        "Test price fetching",
+        "Test data output",
+        "Verify no regressions"
+      ],
+      "verification": {
+        "all_tests_pass": true,
+        "no_runtime_errors": true,
+        "functionality_preserved": true
+      },
+      "success_criteria": [
+        "All tests pass",
+        "System runs end-to-end",
+        "No functionality lost",
+        "Performance maintained"
+      ]
+    },
+    {
+      "step": "15",
+      "name": "Clean Up Old Structure",
+      "description": "Remove old files and folders",
+      "tasks": [
+        "Delete old core/api_clients/ folder",
+        "Delete moved files from core/",
+        "Delete moved files from intelligence/",
+        "Update documentation",
+        "Create migration guide"
+      ],
+      "verification": {
+        "old_files_removed": true,
+        "no_broken_references": true,
+        "documentation_updated": true
+      },
+      "success_criteria": [
+        "Old structure removed",
+        "No broken imports",
+        "Documentation reflects new structure",
+        "Migration guide created"
+      ]
+    }
+  ],
+  "final_validation": {
+    "architecture_checks": [
+      "Clear layer separation (domain, repositories, services, infrastructure)",
+      "Single Responsibility: each module has one clear purpose",
+      "Dependency flow: upper layers depend on lower only",
+      "No circular dependencies",
+      "Domain models are pure dataclasses",
+      "Repositories only do data access",
+      "Services contain business logic",
+      "Infrastructure handles external integrations"
+    ],
+    "code_quality_checks": [
+      "All imports use absolute paths from project root",
+      "All folders have __init__.py",
+      "No duplicate code",
+      "Consistent naming conventions",
+      "Proper error handling maintained"
+    ],
+    "functional_checks": [
+      "System starts successfully",
+      "All tests pass",
+      "Message processing works",
+      "Price fetching works",
+      "Data output works",
+      "No performance degradation"
+    ]
+  },
+  "progression_gate": {
+    "requirements": [
+      "All 15 steps completed",
+      "All verification checks pass",
+      "Final validation complete",
+      "Documentation updated",
+      "Team review approved"
+    ],
+    "next_phase": "System is ready for production deployment with clean architecture"
+  }
+}

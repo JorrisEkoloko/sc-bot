@@ -1,0 +1,147 @@
+{
+  "phase": "Phase 1: Environment Setup",
+  "purpose": "Verify environment configuration and credentials are properly set up",
+  "duration": "1 day",
+
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions about environment configuration",
+    "questions": [
+      {
+        "id": "Q1.1",
+        "question": "Where is the .env file located?",
+        "expected_answer": "Project root directory",
+        "verification": "Must know file location",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.2",
+        "question": "What are the 4 required Telegram environment variables?",
+        "expected_answer": "TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_PHONE, CHANNEL_ID",
+        "verification": "Must know all required variables",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.3",
+        "question": "How many price API keys are configured?",
+        "expected_answer": "4 keys (COINGECKO_API_KEY, BIRDEYE_API_KEY, MORALIS_API_KEY, ETHERSCAN_API_KEY)",
+        "verification": "Must know all API keys",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.4",
+        "question": "What are the two Google Sheets authentication methods?",
+        "expected_answer": "OAuth2 and Service Account",
+        "verification": "Must understand both methods",
+        "reference": "define/environment-setup-guide.md"
+      },
+      {
+        "id": "Q1.5",
+        "question": "What is the current GOOGLE_AUTH_METHOD value?",
+        "expected_answer": "oauth",
+        "verification": "Must know actual configuration",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.6",
+        "question": "What is the TRACKING_DAYS value?",
+        "expected_answer": "7",
+        "verification": "Must know system configuration",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.7",
+        "question": "What is the API_TIMEOUT value?",
+        "expected_answer": "30 seconds",
+        "verification": "Must know timeout configuration",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.8",
+        "question": "Which API does NOT require a key?",
+        "expected_answer": "DexScreener (public API)",
+        "verification": "Must understand API requirements",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q1.9",
+        "question": "What file permissions should .env have?",
+        "expected_answer": "600 (read/write for owner only)",
+        "verification": "Must understand security",
+        "reference": "define/environment-setup-guide.md"
+      },
+      {
+        "id": "Q1.10",
+        "question": "Is the current .env file 100% compatible with new architecture?",
+        "expected_answer": "Yes - zero modifications needed",
+        "verification": "Must understand compatibility",
+        "reference": "define/actual-env-configuration-guide.md"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Review environment setup documentation"
+  },
+
+  "verification_endpoints": {
+    "verify_credentials_present": {
+      "description": "Verify all required credentials are configured",
+      "checks": [
+        "TELEGRAM_API_ID exists and is valid",
+        "TELEGRAM_API_HASH exists and is valid",
+        "TELEGRAM_PHONE exists and is valid",
+        "CHANNEL_ID exists and is valid",
+        "At least one price API key configured",
+        "Google Sheets credentials configured"
+      ]
+    },
+    "verify_directory_structure": {
+      "description": "Verify required directories exist",
+      "checks": [
+        "credentials/ directory exists",
+        "config/ directory exists",
+        "data/ directory exists",
+        "logs/ directory exists",
+        "output/ directory exists"
+      ]
+    },
+    "verify_security": {
+      "description": "Verify security best practices",
+      "checks": [
+        ".env file has correct permissions (600)",
+        ".env is in .gitignore",
+        "credentials/ is in .gitignore",
+        "*.session files are in .gitignore"
+      ]
+    }
+  },
+
+  "validation_checklist": {
+    "credentials_configured": [
+      "Telegram API credentials present",
+      "Price API keys present",
+      "Google Sheets credentials present",
+      "All credentials validated"
+    ],
+    "directory_structure_ready": [
+      "All required directories created",
+      "Permissions set correctly",
+      "Structure matches requirements"
+    ],
+    "security_verified": [
+      "Sensitive files protected",
+      "Git ignore configured",
+      "No credentials in version control"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "All verification endpoints passed",
+      "All validation checklist items complete",
+      "Can connect to Telegram (test)",
+      "Can access Google Sheets (test)"
+    ],
+    "on_pass": "Proceed to Phase 2: Migration Planning",
+    "on_fail": "Fix environment issues before proceeding"
+  }
+}

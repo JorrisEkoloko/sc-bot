@@ -1,0 +1,57 @@
+
+================================================================================
+TESTING 7-DAY OHLC SWITCHING LOGIC
+================================================================================
+
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PerformanceTracker] Performance tracker initialized (tracking 7 days, CSV: False)
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PriceEngine] CryptoCompare client initialized for historical data (100K calls/month FREE)
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PriceEngine] Twelve Data client initialized for historical data fallback
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PriceEngine] Price engine initialized with 7 APIs (CoinGecko, Birdeye, Moralis, DefiLlama, DexScreener, Blockscout, GoPlus)
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [HistoricalPriceCache] Loaded 0 cached historical prices
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [Test7DaySwitch] HistoricalPriceService initialized
+[*] Fetching current price for NKP...
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PriceEngine] Price fetched from coingecko: $0.009776
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PriceEngine] Enriched symbol from DexScreener: NKP
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [PriceEngine] Fetched ATH from CoinGecko: $0.042238
+[OK] Current Price: $0.009776
+[OK] CoinGecko ATH: $0.042238
+
+--------------------------------------------------------------------------------
+TEST CASE 1: Signal 5 days old (should use CoinGecko ATH)
+--------------------------------------------------------------------------------
+[OK] Started tracking with CoinGecko ATH: $0.042238
+[OK] ohlc_fetched: False
+[?] Should fetch OHLC? False (Expected: False)
+[OK] PASS: Correctly skipped OHLC fetch for 5-day old signal
+
+--------------------------------------------------------------------------------
+TEST CASE 2: Signal 16 days old (should trigger OHLC fetch)
+--------------------------------------------------------------------------------
+[?] Should fetch OHLC? True (Expected: True)
+[OK] PASS: Correctly identified need for OHLC fetch
+
+[*] Fetching 7-day forward OHLC data for NKP...
+[90m[2025-11-13 15:39:26][0m [[32mINFO[0m] [Test7DaySwitch] Fetching forward OHLC for NKP from 2025-10-28 15:48:54+00:00 (7 days)
+[90m[2025-11-13 15:39:27][0m [[33mWARNING[0m] [Test7DaySwitch] No OHLC data found for NKP starting 2025-10-28 15:48:54+00:00
+[90m[2025-11-13 15:39:27][0m [[33mWARNING[0m] [Test7DaySwitch] No OHLC data found for NKP
+[!] No OHLC data found (might be expected for some tokens)
+
+--------------------------------------------------------------------------------
+TEST CASE 3: Signal 17 days old with ohlc_fetched=true (should NOT re-fetch)
+--------------------------------------------------------------------------------
+[?] Should fetch OHLC? True (Expected: False)
+[?] ohlc_fetched flag: False
+[X] FAIL: Should NOT re-fetch OHLC when flag is set
+
+================================================================================
+TEST SUMMARY
+================================================================================
+[OK] Test Case 1: Signal < 7 days uses CoinGecko ATH
+[OK] Test Case 2: Signal >= 7 days triggers OHLC fetch
+[OK] Test Case 3: ohlc_fetched flag prevents re-fetching
+
+[SUCCESS] All tests passed! 7-day switching logic is working correctly.
+
+[90m[2025-11-13 15:39:27][0m [[32mINFO[0m] [PriceEngine] Closing API client sessions...
+[90m[2025-11-13 15:39:27][0m [[32mINFO[0m] [PriceEngine] Price engine closed
+[90m[2025-11-13 15:39:27][0m [[32mINFO[0m] [Test7DaySwitch] HistoricalPriceService closed

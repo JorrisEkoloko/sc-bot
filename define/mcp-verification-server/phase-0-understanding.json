@@ -1,0 +1,144 @@
+{
+  "phase": "Phase 0: Understanding",
+  "purpose": "Verify complete comprehension of current system, problems, and solution approach",
+  "duration": "1 day",
+  "
+  
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions before proceeding. Incorrect answers indicate need to re-read documentation.",
+    "questions": [
+      {
+        "id": "Q0.1",
+        "question": "What is the current line count of main.py?",
+        "expected_answer": "4,135 lines",
+        "verification": "Must match exact count from codebase",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.2",
+        "question": "How many directories are in the current src/ structure?",
+        "expected_answer": "24 directories",
+        "verification": "Must match directory count",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.3",
+        "question": "What is the target line count for new main.py?",
+        "expected_answer": "< 500 lines",
+        "verification": "Must understand 88% reduction goal",
+        "reference": "define/crypto-intelligence-rebuild.md"
+      },
+      {
+        "id": "Q0.4",
+        "question": "How many focused components will the new architecture have?",
+        "expected_answer": "19 components",
+        "verification": "Must know exact component count",
+        "reference": "define/complete-pipeline-coverage-summary.md"
+      },
+      {
+        "id": "Q0.5",
+        "question": "What is the exact HDRB formula?",
+        "expected_answer": "IC = retweet + (2 × favorite) + (0.5 × reply)",
+        "verification": "Must know exact research formula",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.6",
+        "question": "How many APIs are in the multi-API price fetching system?",
+        "expected_answer": "6 APIs (CoinGecko, DexScreener, Moralis, Etherscan, Birdeye, DeFiLlama)",
+        "verification": "Must know all 6 APIs",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.7",
+        "question": "What is the ATH tracking period and update interval?",
+        "expected_answer": "7 days (168 hours), 2-hour updates",
+        "verification": "Must know exact tracking configuration",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.8",
+        "question": "How many columns are in the Google Sheets output?",
+        "expected_answer": "37 columns (21 base + 13 API + 3 enhanced)",
+        "verification": "Must know actual column count",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.9",
+        "question": "What percentage of API calls are reduced by targeted ATH checking?",
+        "expected_answer": "99% reduction (2-5 calls vs 500-1000)",
+        "verification": "Must understand optimization impact",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q0.10",
+        "question": "What percentage of functionality must be preserved?",
+        "expected_answer": "100% - all functionality preserved",
+        "verification": "Must understand preservation requirement",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Re-read Phase 0 documentation before proceeding"
+  },
+
+  "verification_endpoints": {
+    "verify_architecture_understanding": {
+      "description": "Verify understanding of architectural transformation",
+      "checks": [
+        "Can explain why 4,135 lines is problematic",
+        "Can describe the 6 core components",
+        "Can explain component responsibilities",
+        "Can describe data flow through system"
+      ]
+    },
+    "verify_preservation_understanding": {
+      "description": "Verify understanding of what must be preserved",
+      "checks": [
+        "Knows HDRB formula must be exact",
+        "Knows all 6 APIs must be preserved",
+        "Knows ATH tracking logic must be exact",
+        "Knows Google Sheets format must match"
+      ]
+    },
+    "verify_problem_understanding": {
+      "description": "Verify understanding of current system problems",
+      "checks": [
+        "Can identify over-engineering issues",
+        "Can explain integration complexity",
+        "Can describe memory management problems",
+        "Can explain configuration sprawl"
+      ]
+    }
+  },
+
+  "validation_checklist": {
+    "documentation_read": [
+      "crypto-intelligence-rebuild.md - Complete",
+      "current-vs-new-architecture-analysis.md - Complete",
+      "complete-pipeline-coverage-summary.md - Complete"
+    ],
+    "understanding_verified": [
+      "Current system complexity understood",
+      "New architecture approach understood",
+      "Functional preservation requirements understood",
+      "Component responsibilities understood"
+    ],
+    "ready_for_next_phase": [
+      "All questionnaire answers correct",
+      "All verification endpoints passed",
+      "Can explain system transformation",
+      "Confident to proceed to environment setup"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "All verification endpoints passed",
+      "All validation checklist items complete"
+    ],
+    "on_pass": "Proceed to Phase 1: Environment Setup",
+    "on_fail": "Review documentation and retry questionnaire"
+  }
+}

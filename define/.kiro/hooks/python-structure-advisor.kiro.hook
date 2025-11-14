@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Python Project Structure Advisor",
+  "description": "Monitors Python project folder structure changes and provides guidance on maintaining clean layered architecture with proper subfolder organization following single responsibility and domain grouping principles",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the current Python project structure in the crypto-intelligence folder. Check if the folder organization follows best practices for layered architecture:\n\n1. **Verify Layer Separation**: Ensure clear boundaries between controllers/API, services, models, repositories, utils, and any event/hook layers\n2. **Check Subfolder Organization**: Look for proper domain grouping within each layer (e.g., services/analytics/, services/notifications/, repositories/database/, repositories/api_clients/)\n3. **Validate Single Responsibility**: Each folder and subfolder should have a clear, specific purpose\n4. **Review Import Patterns**: Check if absolute imports are being used correctly (from crypto-intelligence.services.analytics.roi_calculator import...)\n5. **Assess __init__.py Files**: Verify all folders that should be packages have __init__.py files\n6. **Identify Violations**: Flag any circular dependencies, layer-skipping imports, or unclear folder purposes\n\nProvide specific, actionable recommendations for:\n- Folders that should be created or reorganized\n- Modules that belong in different layers or subfolders\n- Missing __init__.py files\n- Import statement improvements\n- Domain grouping opportunities\n\nFocus on maintaining the principles: Single Responsibility, Layered Access (upper layers depend on lower), Domain Grouping, Python Standards, and Absolute Imports."
+  }
+}

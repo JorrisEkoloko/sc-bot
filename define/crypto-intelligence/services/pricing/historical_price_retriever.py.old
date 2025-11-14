@@ -1,0 +1,1107 @@
+"""
+Historical Price Retriever for ROI Calculation
+
+Fetches historical OHLC data and price-at-timestamp for calculating ROI on past signals.
+Supports CryptoCompare (primary) and Twelve Data (fallback) with persistent caching.
+"""
+
+import aiohttp
+import asyncio
+import json
+import os
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional, Dict, List, Tuple
+from dataclasses import dataclass, asdict
+from utils.logger import setup_logger
+from utils.chain_mapping import get_chain_for_api
+from repositories.api_clients.coinmarketcap_client import CoinMarketCapClient
+from repositories.api_clients.dexscreener_client import DexScreenerClient
+
+
+@dataclass
+class OHLCCandle:
+    """Single OHLC candle data."""
+    timestamp: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float = 0.0
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'timestamp': self.timestamp.isoformat(),
+            'open': self.open,
+            'high': self.high,
+            'low': self.low,
+            'close': self.close,
+            'volume': self.volume
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'OHLCCandle':
+        """Create from dictionary."""
+        return cls(
+            timestamp=datetime.fromisoformat(data['timestamp']),
+            open=data['open'],
+            high=data['high'],
+            low=data['low'],
+            close=data['close'],
+            volume=data.get('volume', 0.0)
+        )
+
+
+@dataclass
+class HistoricalPriceData:
+    """Historical price data result."""
+    symbol: str
+    price_at_timestamp: float
+    ath_in_window: float
+    ath_timestamp: datetime
+    days_to_ath: float
+    candles: List[OHLCCandle]
+    source: str
+    cached: bool = False
+
+
+class HistoricalPriceRetriever:
+    """
+    Retrieves historical price data for ROI calculation.
+    
+    Features:
+    - CryptoCompare primary (100K calls/month)
+    - Twelve Data fallback (800 calls/day)
+    - Persistent caching (historical data immutable)
+    - Smart checkpoint backfilling
+    - Batch processing support
+    """
+    
+    def __init__(
+        self,
+        cryptocompare_api_key: Optional[str] = None,
+        twelvedata_api_key: Optional[str] = None,
+        cache_dir: str = "data/cache",
+        symbol_mapping_path: str = "data/symbol_mapping.json",
+        request_timeout: int = 10,
+        cache_save_interval: int = 10,
+        logger=None
+    ):
+        """
+        Initialize historical price retriever.
+        
+        Args:
+            cryptocompare_api_key: CryptoCompare API key (optional)
+            twelvedata_api_key: Twelve Data API key (optional)
+            cache_dir: Directory for persistent cache
+            symbol_mapping_path: Path to symbol mapping JSON file
+            request_timeout: HTTP request timeout in seconds (default: 10)
+            cache_save_interval: Save cache after N new entries (default: 10, 0=save immediately)
+            logger: Logger instance
+        """
+        self.cryptocompare_api_key = cryptocompare_api_key or ""
+        self.twelvedata_api_key = twelvedata_api_key or ""
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.logger = logger or setup_logger('HistoricalPriceRetriever')
+        
+        # Configuration
+        self.request_timeout = request_timeout
+        self.cache_save_interval = cache_save_interval
+        self._cache_dirty_count = 0  # Track unsaved cache entries
+        
+        # API endpoints
+        self.cryptocompare_base = "https://min-api.cryptocompare.com/data"
+        self.twelvedata_base = "https://api.twelvedata.com"
+        
+        # HTTP session
+        self.session: Optional[aiohttp.ClientSession] = None
+        
+        # In-memory cache
+        self.memory_cache: Dict[str, HistoricalPriceData] = {}
+        
+        # Load symbol mapping
+        self.symbol_mapping = self._load_symbol_mapping(symbol_mapping_path)
+        
+        # Load persistent cache
+        self._load_cache()
+        
+        self.logger.info(
+            f"HistoricalPriceRetriever initialized "
+            f"(timeout={request_timeout}s, cache_interval={cache_save_interval})"
+        )
+    
+    def _load_symbol_mapping(self, mapping_path: str) -> Dict:
+        """Load symbol mapping from JSON file."""
+        try:
+            with open(mapping_path, 'r') as f:
+                mapping = json.load(f)
+                self.logger.info(f"Loaded symbol mapping for {len(mapping)} tokens")
+                return mapping
+        except FileNotFoundError:
+            self.logger.warning(f"Symbol mapping file not found: {mapping_path}")
+            return {}
+        except Exception as e:
+            self.logger.error(f"Failed to load symbol mapping: {e}")
+            return {}
+    
+    def get_api_symbol(self, address: str, api_name: str, fallback_symbol: str) -> str:
+        """
+        Get the correct symbol for a specific API using the mapping.
+        
+        Args:
+            address: Token contract address
+            api_name: API name ('coingecko', 'dexscreener', 'coinmarketcap', etc.)
+            fallback_symbol: Fallback symbol if mapping not found
+            
+        Returns:
+            Correct symbol for the API
+        """
+        address_lower = address.lower()
+        
+        if address_lower in self.symbol_mapping:
+            token_data = self.symbol_mapping[address_lower]
+            api_symbols = token_data.get('symbols', {})
+            
+            if api_name in api_symbols:
+                mapped_symbol = api_symbols[api_name]
+                if mapped_symbol != fallback_symbol:
+                    self.logger.info(
+                        f"Symbol mapping: {fallback_symbol} → {mapped_symbol} "
+                        f"(for {api_name}, address {address[:10]}...)"
+                    )
+                return mapped_symbol
+        
+        return fallback_symbol
+    
+    def _load_cache(self):
+        """Load persistent cache from disk."""
+        cache_file = self.cache_dir / "historical_prices.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                    self.logger.info(f"Loaded {len(cache_data)} cached historical prices")
+            except Exception as e:
+                self.logger.warning(f"Failed to load cache: {e}")
+    
+    def _save_cache(self, force: bool = False):
+        """
+        Save persistent cache to disk with batching.
+        
+        Args:
+            force: Force save regardless of dirty count
+        """
+        # Skip if no changes and not forced
+        if not force and self._cache_dirty_count == 0:
+            return
+        
+        # Skip if interval not reached and not forced
+        if not force and self.cache_save_interval > 0 and self._cache_dirty_count < self.cache_save_interval:
+            return
+        
+        cache_file = self.cache_dir / "historical_prices.json"
+        try:
+            # Convert memory cache to serializable format
+            cache_data = {}
+            for key, data in self.memory_cache.items():
+                cache_data[key] = {
+                    'symbol': data.symbol,
+                    'price_at_timestamp': data.price_at_timestamp,
+                    'ath_in_window': data.ath_in_window,
+                    'ath_timestamp': data.ath_timestamp.isoformat(),
+                    'days_to_ath': data.days_to_ath,
+                    'candles': [c.to_dict() for c in data.candles],
+                    'source': data.source
+                }
+            
+            with open(cache_file, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            
+            self.logger.debug(f"Saved cache with {len(cache_data)} entries")
+            self._cache_dirty_count = 0  # Reset counter
+        except Exception as e:
+            self.logger.error(f"Failed to save cache: {e}")
+    
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create HTTP session."""
+        if not self.session or self.session.closed:
+            self.session = aiohttp.ClientSession()
+        return self.session
+    
+    async def close(self):
+        """Close HTTP session and save any pending cache."""
+        # Save any pending cache entries
+        self._save_cache(force=True)
+        
+        # Close session
+        if self.session and not self.session.closed:
+            await self.session.close()
+            self.session = None
+    
+    def _get_cache_key(self, symbol: str, timestamp: datetime, window_days: int) -> str:
+        """Generate cache key."""
+        date_str = timestamp.strftime('%Y-%m-%d')
+        return f"{symbol}_{date_str}_{window_days}d"
+    
+    async def fetch_price_at_timestamp(
+        self,
+        symbol: str,
+        timestamp: datetime
+    ) -> Optional[float]:
+        """
+        Fetch price at specific timestamp (for entry price).
+        
+        This is the KEY FIX: Use historical price from message date, not current price!
+        
+        Args:
+            symbol: Token symbol (e.g., 'BTC', 'ETH')
+            timestamp: Exact timestamp to fetch price for
+            
+        Returns:
+            Price in USD, or None if not found
+        """
+        # Try CryptoCompare first
+        price = await self._fetch_cryptocompare_price_at_timestamp(symbol, timestamp)
+        if price:
+            return price
+        
+        # Fallback to Twelve Data
+        price = await self._fetch_twelvedata_price_at_timestamp(symbol, timestamp)
+        if price:
+            return price
+        
+        self.logger.warning(f"No historical price found for {symbol} at {timestamp}")
+        return None
+    
+    async def fetch_closest_entry_price(
+        self,
+        symbol: str,
+        message_timestamp: datetime,
+        address: Optional[str] = None,
+        chain: Optional[str] = None
+    ) -> Tuple[Optional[float], str]:
+        """
+        Fetch the closest available price to message timestamp with smart fallback.
+        
+        Strategy:
+        1. Get correct symbol from DexScreener (if address provided)
+        2. Try exact message timestamp with correct symbol
+        3. Try ±1 hour window
+        4. Try ±6 hours window
+        5. Try ±24 hours window
+        6. Try DexScreener current price for small tokens
+        7. Fallback to current price
+        
+        Args:
+            symbol: Token symbol (e.g., 'BTC', 'ETH')
+            message_timestamp: Message timestamp
+            address: Optional token contract address for symbol lookup
+            chain: Optional blockchain name for symbol lookup
+            
+        Returns:
+            Tuple of (price, source_description)
+            
+        Example:
+            price, source = await fetch_closest_entry_price('BTC', message_date)
+            # Returns: (42000.0, 'exact_time') or (41500.0, '1h_before')
+        """
+        self.logger.info(f"Fetching closest entry price for {symbol} at {message_timestamp}")
+        
+        # STEP 1: Get correct symbol using local symbol mapping first
+        correct_symbol = symbol
+        if address:
+            # Try local symbol mapping first (fastest, no API calls)
+            self.logger.debug(f"Checking symbol mapping for address: {address}")
+            mapped_symbol = self.get_api_symbol(address, 'cryptocompare', symbol)
+            self.logger.debug(f"Mapped symbol result: {mapped_symbol}")
+            if mapped_symbol != symbol:
+                correct_symbol = mapped_symbol
+                self.logger.info(f"Symbol mapping: {symbol} → {correct_symbol} (from local mapping)")
+            
+            # If no local mapping, try CoinMarketCap API
+            elif chain:
+                try:
+                    coinmarketcap_key = os.getenv('COINMARKETCAP_API_KEY', '')
+                    if coinmarketcap_key:
+                        cmc_client = CoinMarketCapClient(coinmarketcap_key, logger=self.logger)
+                        metadata = await cmc_client.get_token_metadata(address, chain)
+                        await cmc_client.close()
+                        
+                        if metadata and metadata.get('symbol'):
+                            correct_symbol = metadata['symbol']
+                            if correct_symbol != symbol:
+                                self.logger.info(f"Symbol mapping: {symbol} → {correct_symbol} (from CoinMarketCap)")
+                except Exception as e:
+                    self.logger.debug(f"CoinMarketCap symbol lookup failed: {e}")
+                
+                # Fallback to DexScreener if CoinMarketCap didn't work
+                if correct_symbol == symbol:
+                    try:
+                        dex_client = DexScreenerClient(logger=self.logger)
+                        price_data = await dex_client.get_price(address, chain)
+                        await dex_client.close()
+                        
+                        if price_data and price_data.symbol:
+                            correct_symbol = price_data.symbol
+                            if correct_symbol != symbol:
+                                self.logger.info(f"Symbol mapping: {symbol} → {correct_symbol} (from DexScreener)")
+                    except Exception as e:
+                        self.logger.debug(f"DexScreener symbol lookup failed: {e}")
+        
+        # STEP 2: Try historical prices with correct symbol
+        symbol = correct_symbol
+        
+        # Try exact message timestamp
+        price = await self.fetch_price_at_timestamp(symbol, message_timestamp)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found exact price at message time: ${price:.6f}")
+            return price, "exact_time"
+        
+        # Try 1 hour before (accounts for small processing delays)
+        lookback_1h = message_timestamp - timedelta(hours=1)
+        price = await self.fetch_price_at_timestamp(symbol, lookback_1h)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found price 1h before message: ${price:.6f}")
+            return price, "1h_before"
+        
+        # Try 1 hour after (in case timestamp is slightly off)
+        lookahead_1h = message_timestamp + timedelta(hours=1)
+        price = await self.fetch_price_at_timestamp(symbol, lookahead_1h)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found price 1h after message: ${price:.6f}")
+            return price, "1h_after"
+        
+        # Try 6 hours before
+        lookback_6h = message_timestamp - timedelta(hours=6)
+        price = await self.fetch_price_at_timestamp(symbol, lookback_6h)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found price 6h before message: ${price:.6f}")
+            return price, "6h_before"
+        
+        # Try 6 hours after
+        lookahead_6h = message_timestamp + timedelta(hours=6)
+        price = await self.fetch_price_at_timestamp(symbol, lookahead_6h)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found price 6h after message: ${price:.6f}")
+            return price, "6h_after"
+        
+        # Try 24 hours before (conservative fallback)
+        lookback_24h = message_timestamp - timedelta(hours=24)
+        price = await self.fetch_price_at_timestamp(symbol, lookback_24h)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found price 24h before message: ${price:.6f}")
+            return price, "24h_before"
+        
+        # Try 24 hours after
+        lookahead_24h = message_timestamp + timedelta(hours=24)
+        price = await self.fetch_price_at_timestamp(symbol, lookahead_24h)
+        if price and price > 0:
+            self.logger.info(f"[OK] Found price 24h after message: ${price:.6f}")
+            return price, "24h_after"
+        
+        # Try DefiLlama for small tokens (if address provided) - BEST for historical data
+        if address and chain:
+            self.logger.info(f"Trying DefiLlama for historical price {symbol} ({address[:10]}...)")
+            try:
+                # Try exact timestamp
+                price = await self._fetch_defillama_price_at_timestamp(address, chain, message_timestamp)
+                if price and price > 0:
+                    self.logger.info(f"[OK] Found historical price from DefiLlama: ${price:.8f}")
+                    return price, "defillama_historical"
+                
+                # Try 1 hour before
+                price = await self._fetch_defillama_price_at_timestamp(address, chain, message_timestamp - timedelta(hours=1))
+                if price and price > 0:
+                    self.logger.info(f"[OK] Found historical price from DefiLlama (1h before): ${price:.8f}")
+                    return price, "defillama_historical_1h"
+                
+                # Try 24 hours before
+                price = await self._fetch_defillama_price_at_timestamp(address, chain, message_timestamp - timedelta(hours=24))
+                if price and price > 0:
+                    self.logger.info(f"[OK] Found historical price from DefiLlama (24h before): ${price:.8f}")
+                    return price, "defillama_historical_24h"
+            except Exception as e:
+                self.logger.debug(f"DefiLlama historical fallback failed: {e}")
+        
+        # Try DexScreener for current price as last resort (if address provided)
+        if address and chain:
+            self.logger.info(f"Trying DexScreener for current price {symbol} ({address[:10]}...)")
+            try:
+                dex_client = DexScreenerClient(logger=self.logger)
+                price_data = await dex_client.get_price(address, chain)
+                await dex_client.close()
+                
+                if price_data and price_data.price_usd > 0:
+                    self.logger.info(f"[OK] Found current price from DexScreener: ${price_data.price_usd:.6f}")
+                    return price_data.price_usd, "dexscreener_current"
+            except Exception as e:
+                self.logger.warning(f"DexScreener fallback failed: {e}")
+        
+        # No historical price found
+        self.logger.warning(f"[WARNING] No historical price found for {symbol} within +/-24h of {message_timestamp}")
+        return None, "not_found"
+    
+    async def _fetch_cryptocompare_price_at_timestamp(
+        self,
+        symbol: str,
+        timestamp: datetime
+    ) -> Optional[float]:
+        """Fetch price from CryptoCompare at specific timestamp."""
+        try:
+            unix_ts = int(timestamp.timestamp())
+            url = f"{self.cryptocompare_base}/pricehistorical?fsym={symbol}&tsyms=USD&ts={unix_ts}"
+            
+            if self.cryptocompare_api_key:
+                url += f"&api_key={self.cryptocompare_api_key}"
+            
+            session = await self._get_session()
+            async with session.get(url, timeout=self.request_timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data.get('Response') == 'Error':
+                        self.logger.debug(f"CryptoCompare error for {symbol}: {data.get('Message')}")
+                        return None
+                    
+                    if symbol in data and 'USD' in data[symbol]:
+                        price = data[symbol]['USD']
+                        if price and price > 0:
+                            self.logger.debug(f"CryptoCompare: {symbol} at {timestamp} = ${price:.6f}")
+                            return float(price)
+                
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching CryptoCompare price for {symbol}: {e}")
+            return None
+    
+    async def _fetch_twelvedata_price_at_timestamp(
+        self,
+        symbol: str,
+        timestamp: datetime
+    ) -> Optional[float]:
+        """Fetch price from Twelve Data at specific timestamp."""
+        try:
+            # Twelve Data requires date in YYYY-MM-DD format
+            date_str = timestamp.strftime('%Y-%m-%d')
+            url = f"{self.twelvedata_base}/time_series"
+            params = {
+                'symbol': f"{symbol}/USD",
+                'interval': '1day',
+                'outputsize': 1,
+                'date': date_str,
+                'apikey': self.twelvedata_api_key
+            }
+            
+            session = await self._get_session()
+            async with session.get(url, params=params, timeout=self.request_timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if 'values' in data and len(data['values']) > 0:
+                        close_price = float(data['values'][0]['close'])
+                        self.logger.debug(f"Twelve Data: {symbol} at {timestamp} = ${close_price:.6f}")
+                        return close_price
+                
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching Twelve Data price for {symbol}: {e}")
+            return None
+    
+    async def fetch_ohlc_window(
+        self,
+        symbol: str,
+        start_timestamp: datetime,
+        window_days: int = 30
+    ) -> Optional[HistoricalPriceData]:
+        """
+        Fetch OHLC data for a time window to find ATH.
+        
+        Args:
+            symbol: Token symbol
+            start_timestamp: Start of window (message date)
+            window_days: Number of days to fetch (default: 30)
+            
+        Returns:
+            HistoricalPriceData with ATH and candles, or None
+        """
+        # Check cache first
+        cache_key = self._get_cache_key(symbol, start_timestamp, window_days)
+        if cache_key in self.memory_cache:
+            self.logger.debug(f"Cache hit: {symbol} at {start_timestamp}")
+            cached_data = self.memory_cache[cache_key]
+            cached_data.cached = True
+            return cached_data
+        
+        # Try CryptoCompare first
+        data = await self._fetch_cryptocompare_ohlc(symbol, start_timestamp, window_days)
+        if data:
+            self.memory_cache[cache_key] = data
+            self._cache_dirty_count += 1
+            self._save_cache()  # Will only save if interval reached
+            return data
+        
+        # Fallback to Twelve Data
+        data = await self._fetch_twelvedata_ohlc(symbol, start_timestamp, window_days)
+        if data:
+            self.memory_cache[cache_key] = data
+            self._cache_dirty_count += 1
+            self._save_cache()  # Will only save if interval reached
+            return data
+        
+        self.logger.warning(f"No OHLC data found for {symbol} starting {start_timestamp}")
+        return None
+    
+    async def _fetch_cryptocompare_ohlc(
+        self,
+        symbol: str,
+        start_timestamp: datetime,
+        window_days: int
+    ) -> Optional[HistoricalPriceData]:
+        """Fetch OHLC from CryptoCompare."""
+        try:
+            # Calculate end timestamp (start + window_days)
+            end_timestamp = start_timestamp + timedelta(days=window_days)
+            unix_ts = int(end_timestamp.timestamp())
+            
+            url = f"{self.cryptocompare_base}/v2/histoday"
+            params = {
+                'fsym': symbol,
+                'tsym': 'USD',
+                'limit': window_days,
+                'toTs': unix_ts  # Fetch backwards from end_timestamp to start_timestamp
+            }
+            
+            if self.cryptocompare_api_key:
+                params['api_key'] = self.cryptocompare_api_key
+            
+            session = await self._get_session()
+            async with session.get(url, params=params, timeout=self.request_timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data.get('Response') == 'Error':
+                        self.logger.debug(f"CryptoCompare OHLC error for {symbol}: {data.get('Message')}")
+                        return None
+                    
+                    if 'Data' in data and 'Data' in data['Data']:
+                        candles_data = data['Data']['Data']
+                        if not candles_data:
+                            return None
+                        
+                        # Parse candles
+                        candles = []
+                        for candle in candles_data:
+                            candles.append(OHLCCandle(
+                                timestamp=datetime.fromtimestamp(candle['time']),
+                                open=candle['open'],
+                                high=candle['high'],
+                                low=candle['low'],
+                                close=candle['close'],
+                                volume=candle.get('volumeto', 0.0)
+                            ))
+                        
+                        # Find ATH in window
+                        ath_candle = max(candles, key=lambda c: c.high)
+                        entry_price = candles[0].open
+                        
+                        # Calculate days to ATH
+                        days_to_ath = (ath_candle.timestamp - candles[0].timestamp).total_seconds() / 86400
+                        
+                        self.logger.info(
+                            f"CryptoCompare: {symbol} - {len(candles)} candles, "
+                            f"ATH ${ath_candle.high:.6f} on day {days_to_ath:.1f}"
+                        )
+                        
+                        return HistoricalPriceData(
+                            symbol=symbol,
+                            price_at_timestamp=entry_price,
+                            ath_in_window=ath_candle.high,
+                            ath_timestamp=ath_candle.timestamp,
+                            days_to_ath=days_to_ath,
+                            candles=candles,
+                            source='cryptocompare'
+                        )
+                
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching CryptoCompare OHLC for {symbol}: {e}")
+            return None
+    
+    async def _fetch_twelvedata_ohlc(
+        self,
+        symbol: str,
+        start_timestamp: datetime,
+        window_days: int
+    ) -> Optional[HistoricalPriceData]:
+        """Fetch OHLC from Twelve Data."""
+        try:
+            url = f"{self.twelvedata_base}/time_series"
+            params = {
+                'symbol': f"{symbol}/USD",
+                'interval': '1day',
+                'outputsize': window_days,
+                'apikey': self.twelvedata_api_key
+            }
+            
+            session = await self._get_session()
+            async with session.get(url, params=params, timeout=self.request_timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if 'values' in data and len(data['values']) > 0:
+                        # Parse candles (Twelve Data returns newest first)
+                        candles = []
+                        for candle_data in reversed(data['values']):  # Reverse to get oldest first
+                            candles.append(OHLCCandle(
+                                timestamp=datetime.strptime(candle_data['datetime'], '%Y-%m-%d'),
+                                open=float(candle_data['open']),
+                                high=float(candle_data['high']),
+                                low=float(candle_data['low']),
+                                close=float(candle_data['close']),
+                                volume=float(candle_data.get('volume', 0))
+                            ))
+                        
+                        # Find ATH in window
+                        ath_candle = max(candles, key=lambda c: c.high)
+                        entry_price = candles[0].open
+                        
+                        # Calculate days to ATH
+                        days_to_ath = (ath_candle.timestamp - candles[0].timestamp).total_seconds() / 86400
+                        
+                        self.logger.info(
+                            f"Twelve Data: {symbol} - {len(candles)} candles, "
+                            f"ATH ${ath_candle.high:.6f} on day {days_to_ath:.1f}"
+                        )
+                        
+                        return HistoricalPriceData(
+                            symbol=symbol,
+                            price_at_timestamp=entry_price,
+                            ath_in_window=ath_candle.high,
+                            ath_timestamp=ath_candle.timestamp,
+                            days_to_ath=days_to_ath,
+                            candles=candles,
+                            source='twelvedata'
+                        )
+                
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching Twelve Data OHLC for {symbol}: {e}")
+            return None
+    
+    def calculate_smart_checkpoints(
+        self,
+        message_date: datetime,
+        current_date: Optional[datetime] = None
+    ) -> List[Tuple[str, timedelta]]:
+        """
+        Calculate which checkpoints have been reached based on elapsed time.
+        
+        Args:
+            message_date: Date of the original message
+            current_date: Current date (default: now)
+            
+        Returns:
+            List of (checkpoint_name, timedelta) for reached checkpoints
+        """
+        if current_date is None:
+            current_date = datetime.now()
+        
+        elapsed = current_date - message_date
+        
+        # All possible checkpoints
+        all_checkpoints = [
+            ('1h', timedelta(hours=1)),
+            ('4h', timedelta(hours=4)),
+            ('24h', timedelta(hours=24)),
+            ('3d', timedelta(days=3)),
+            ('7d', timedelta(days=7)),
+            ('30d', timedelta(days=30))
+        ]
+        
+        # Return only reached checkpoints
+        reached = [(name, delta) for name, delta in all_checkpoints if elapsed >= delta]
+        
+        self.logger.debug(
+            f"Elapsed: {elapsed.days} days - "
+            f"Reached checkpoints: {[name for name, _ in reached]}"
+        )
+        
+        return reached
+    
+    async def fetch_checkpoint_prices(
+        self,
+        symbol: str,
+        message_date: datetime,
+        checkpoints: List[Tuple[str, timedelta]]
+    ) -> Dict[str, float]:
+        """
+        Fetch prices at specific checkpoint timestamps.
+        
+        Args:
+            symbol: Token symbol
+            message_date: Original message date
+            checkpoints: List of (name, timedelta) checkpoints
+            
+        Returns:
+            Dict of checkpoint_name -> price
+        """
+        checkpoint_prices = {}
+        
+        for checkpoint_name, delta in checkpoints:
+            checkpoint_time = message_date + delta
+            price = await self.fetch_price_at_timestamp(symbol, checkpoint_time)
+            
+            if price:
+                checkpoint_prices[checkpoint_name] = price
+                self.logger.debug(f"{checkpoint_name}: ${price:.6f}")
+            else:
+                self.logger.warning(f"{checkpoint_name}: No price data")
+        
+        return checkpoint_prices
+    
+    async def fetch_batch_ohlc(
+        self,
+        symbols: List[str],
+        start_timestamp: datetime,
+        window_days: int = 30,
+        max_concurrent: int = 5
+    ) -> Dict[str, Optional[HistoricalPriceData]]:
+        """
+        Fetch OHLC data for multiple tokens in parallel (batch processing).
+        
+        Args:
+            symbols: List of token symbols
+            start_timestamp: Start of window (message date)
+            window_days: Number of days to fetch (default: 30)
+            max_concurrent: Maximum concurrent requests (default: 5)
+            
+        Returns:
+            Dict of symbol -> HistoricalPriceData (or None if failed)
+        """
+        self.logger.info(f"Batch fetching OHLC for {len(symbols)} tokens (max {max_concurrent} concurrent)")
+        
+        results = {}
+        
+        # Process in batches to respect rate limits
+        for i in range(0, len(symbols), max_concurrent):
+            batch = symbols[i:i + max_concurrent]
+            self.logger.debug(f"Processing batch {i//max_concurrent + 1}: {batch}")
+            
+            # Fetch batch concurrently
+            tasks = [
+                self.fetch_ohlc_window(symbol, start_timestamp, window_days)
+                for symbol in batch
+            ]
+            
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Store results
+            for symbol, result in zip(batch, batch_results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Error fetching {symbol}: {result}")
+                    results[symbol] = None
+                else:
+                    results[symbol] = result
+            
+            # Small delay between batches to respect rate limits
+            if i + max_concurrent < len(symbols):
+                await asyncio.sleep(0.5)
+        
+        successful = sum(1 for r in results.values() if r is not None)
+        self.logger.info(f"Batch complete: {successful}/{len(symbols)} successful")
+        
+        return results
+    
+    async def fetch_batch_prices_at_timestamp(
+        self,
+        symbols: List[str],
+        timestamp: datetime,
+        max_concurrent: int = 5
+    ) -> Dict[str, Optional[float]]:
+        """
+        Fetch prices for multiple tokens at specific timestamp (batch processing).
+        
+        Args:
+            symbols: List of token symbols
+            timestamp: Exact timestamp to fetch prices for
+            max_concurrent: Maximum concurrent requests (default: 5)
+            
+        Returns:
+            Dict of symbol -> price (or None if failed)
+        """
+        self.logger.info(f"Batch fetching prices for {len(symbols)} tokens at {timestamp}")
+        
+        results = {}
+        
+        # Process in batches to respect rate limits
+        for i in range(0, len(symbols), max_concurrent):
+            batch = symbols[i:i + max_concurrent]
+            
+            # Fetch batch concurrently
+            tasks = [
+                self.fetch_price_at_timestamp(symbol, timestamp)
+                for symbol in batch
+            ]
+            
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Store results
+            for symbol, result in zip(batch, batch_results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Error fetching {symbol}: {result}")
+                    results[symbol] = None
+                else:
+                    results[symbol] = result
+            
+            # Small delay between batches to respect rate limits
+            if i + max_concurrent < len(symbols):
+                await asyncio.sleep(0.5)
+        
+        successful = sum(1 for r in results.values() if r is not None and r > 0)
+        self.logger.info(f"Batch complete: {successful}/{len(symbols)} successful")
+        
+        return results
+    
+    async def fetch_forward_ohlc_with_ath(
+        self,
+        symbol: str,
+        entry_timestamp: datetime,
+        window_days: int = 30
+    ) -> Optional[Dict]:
+        """
+        Fetch forward OHLC data and calculate ATH from candles.
+        
+        This method fetches OHLC candles FORWARD from entry timestamp
+        and finds the actual ATH that occurred in that window.
+        
+        Args:
+            symbol: Token symbol (e.g., 'BTC', 'ETH')
+            entry_timestamp: Entry timestamp (message date)
+            window_days: Number of days forward to fetch (default: 30)
+            
+        Returns:
+            Dictionary with:
+            {
+                'ath_price': float,
+                'ath_timestamp': datetime,
+                'days_to_ath': float,
+                'candles': List[OHLCCandle],
+                'entry_price': float,
+                'source': str,
+                'data_completeness': float  # 0.0-1.0
+            }
+            
+        Example:
+            result = await fetch_forward_ohlc_with_ath('BTC', message_date, 30)
+            print(f"ATH: ${result['ath_price']} on day {result['days_to_ath']}")
+        """
+        self.logger.info(f"Fetching forward OHLC for {symbol} from {entry_timestamp} ({window_days} days)")
+        
+        # Fetch OHLC data using existing method
+        historical_data = await self.fetch_ohlc_window(symbol, entry_timestamp, window_days)
+        
+        if not historical_data or not historical_data.candles:
+            self.logger.warning(f"No OHLC data found for {symbol}")
+            return None
+        
+        # Calculate data completeness
+        expected_candles = window_days
+        actual_candles = len(historical_data.candles)
+        data_completeness = min(actual_candles / expected_candles, 1.0)
+        
+        self.logger.info(
+            f"[OK] Found {actual_candles}/{expected_candles} candles "
+            f"({data_completeness*100:.1f}% complete)"
+        )
+        
+        # Return structured result
+        return {
+            'ath_price': historical_data.ath_in_window,
+            'ath_timestamp': historical_data.ath_timestamp,
+            'days_to_ath': historical_data.days_to_ath,
+            'candles': historical_data.candles,
+            'entry_price': historical_data.price_at_timestamp,
+            'source': historical_data.source,
+            'data_completeness': data_completeness
+        }
+    
+    async def calculate_checkpoint_rois_from_ohlc(
+        self,
+        entry_price: float,
+        entry_timestamp: datetime,
+        checkpoints: List[Tuple[str, timedelta]],
+        candles: List[OHLCCandle]
+    ) -> Dict[str, float]:
+        """
+        Calculate ROI at each checkpoint using OHLC candle data.
+        
+        Instead of fetching price at each checkpoint individually,
+        this method uses the OHLC candles to find the closest candle
+        and uses its close price.
+        
+        Args:
+            entry_price: Entry price (from entry timestamp)
+            entry_timestamp: Entry timestamp (message date)
+            checkpoints: List of (checkpoint_name, timedelta) tuples
+            candles: List of OHLC candles
+            
+        Returns:
+            Dict of checkpoint_name -> roi_multiplier
+            
+        Example:
+            checkpoints = [('1h', timedelta(hours=1)), ('24h', timedelta(days=1))]
+            rois = await calculate_checkpoint_rois_from_ohlc(
+                entry_price=42000,
+                entry_timestamp=message_date,
+                checkpoints=checkpoints,
+                candles=ohlc_candles
+            )
+            # Returns: {'1h': 1.002, '24h': 1.024}
+        """
+        self.logger.info(f"Calculating {len(checkpoints)} checkpoint ROIs from {len(candles)} candles")
+        
+        checkpoint_rois = {}
+        
+        for checkpoint_name, delta in checkpoints:
+            checkpoint_time = entry_timestamp + delta
+            
+            # Find the closest candle to checkpoint time
+            closest_candle = self._find_closest_candle(candles, checkpoint_time)
+            
+            if closest_candle:
+                # Use candle's close price for checkpoint
+                checkpoint_price = closest_candle.close
+                roi_multiplier = checkpoint_price / entry_price
+                
+                checkpoint_rois[checkpoint_name] = roi_multiplier
+                
+                self.logger.debug(
+                    f"  {checkpoint_name}: ${checkpoint_price:.6f} "
+                    f"({roi_multiplier:.3f}x, {(roi_multiplier-1)*100:+.1f}%)"
+                )
+            else:
+                self.logger.warning(f"  {checkpoint_name}: No candle found near {checkpoint_time}")
+        
+        return checkpoint_rois
+    
+    def _find_closest_candle(
+        self,
+        candles: List[OHLCCandle],
+        target_time: datetime
+    ) -> Optional[OHLCCandle]:
+        """
+        Find the candle closest to target time.
+        
+        For daily candles, matches to the same calendar day.
+        For hourly candles, matches to the nearest hour.
+        
+        Args:
+            candles: List of OHLC candles
+            target_time: Target timestamp
+            
+        Returns:
+            Closest OHLCCandle or None
+        """
+        if not candles:
+            return None
+        
+        # Determine if these are daily or hourly candles
+        is_daily_candles = False
+        if len(candles) > 1:
+            candle_interval = abs((candles[1].timestamp - candles[0].timestamp).total_seconds())
+            is_daily_candles = candle_interval > 43200  # More than 12 hours = daily candles
+        
+        if is_daily_candles:
+            # For daily candles, match by calendar day (ignore time of day)
+            target_date = target_time.date()
+            for candle in candles:
+                candle_date = candle.timestamp.date()
+                # Match if same day, or within 1 day
+                day_diff = abs((candle_date - target_date).days)
+                if day_diff <= 1:
+                    return candle
+            return None
+        else:
+            # For hourly/minute candles, find closest by timestamp
+            closest = min(
+                candles,
+                key=lambda c: abs((c.timestamp - target_time).total_seconds())
+            )
+            
+            time_diff = abs((closest.timestamp - target_time).total_seconds())
+            max_diff = 7200  # Allow 2 hours for hourly candles
+            
+            if time_diff <= max_diff:
+                return closest
+            
+            return None
+
+    async def _fetch_defillama_price_at_timestamp(
+        self,
+        address: str,
+        chain: str,
+        timestamp: datetime
+    ) -> Optional[float]:
+        """
+        Fetch historical price from DefiLlama at specific timestamp.
+        
+        DefiLlama is the best source for historical data:
+        - FREE (no API key required)
+        - Extensive historical data
+        - High confidence scores
+        - Works for small-cap tokens
+        
+        Args:
+            address: Token contract address
+            chain: Blockchain name (ethereum, solana, etc.)
+            timestamp: Timestamp to fetch price for
+            
+        Returns:
+            Price in USD, or None if not found
+        """
+        try:
+            # Map chain to DefiLlama format using shared utility
+            llama_chain = get_chain_for_api(chain, 'defillama')
+            
+            # Convert timestamp to Unix
+            unix_ts = int(timestamp.timestamp())
+            
+            # Build URL: /prices/historical/{timestamp}/{chain}:{address}
+            url = f"https://coins.llama.fi/prices/historical/{unix_ts}/{llama_chain}:{address}"
+            
+            session = await self._get_session()
+            async with session.get(url, timeout=self.request_timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Extract price from response
+                    coins = data.get('coins', {})
+                    coin_key = f"{llama_chain}:{address}"
+                    
+                    if coin_key in coins:
+                        coin_data = coins[coin_key]
+                        price = coin_data.get('price')
+                        confidence = coin_data.get('confidence', 0)
+                        
+                        if price and price > 0:
+                            self.logger.debug(
+                                f"DefiLlama: {address[:10]}... at {timestamp} = ${price:.8f} "
+                                f"(confidence: {confidence:.2f})"
+                            )
+                            return float(price)
+                    
+                    self.logger.debug(f"DefiLlama: No price data for {address[:10]}... at {timestamp}")
+                    return None
+                else:
+                    self.logger.debug(f"DefiLlama HTTP {response.status} for {address[:10]}...")
+                    return None
+                    
+        except Exception as e:
+            self.logger.error(f"Error fetching DefiLlama price for {address}: {e}")
+            return None

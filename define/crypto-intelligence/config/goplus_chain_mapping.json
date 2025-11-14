@@ -1,0 +1,28 @@
+{
+  "description": "GoPlus Labs chain ID mappings for multi-chain support",
+  "note": "GoPlus uses numeric chain IDs. See: https://docs.gopluslabs.io/",
+  "mappings": {
+    "evm": "1",
+    "eth": "1",
+    "ethereum": "1",
+    "bsc": "56",
+    "bnb": "56",
+    "polygon": "137",
+    "matic": "137",
+    "arbitrum": "42161",
+    "arb": "42161",
+    "optimism": "10",
+    "op": "10",
+    "avalanche": "43114",
+    "avax": "43114",
+    "fantom": "250",
+    "ftm": "250",
+    "base": "8453",
+    "cronos": "25",
+    "moonbeam": "1284",
+    "moonriver": "1285",
+    "okc": "66",
+    "heco": "128",
+    "kcc": "321"
+  }
+}

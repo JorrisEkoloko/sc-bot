@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Crypto Intelligence Python Verifier",
+  "description": "Automatically verifies Python files in crypto-intelligence/ for method call correctness, API endpoint validation, parameter completeness, and common implementation errors when saved.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A Python file has been saved in the crypto-intelligence directory. Please analyze it for implementation errors:\n\n1. **Method Call Verification**: Scan for new or modified function/method calls and verify that:\n   - Called methods exist in their respective modules\n   - Method names are spelled correctly (check for common typos)\n   - Import statements are present for all external dependencies\n\n2. **API Endpoint Validation**: Check for API endpoint references and validate against known patterns:\n   - CoinGecko API: https://www.coingecko.com/api/documentation\n   - Birdeye API: https://docs.birdeye.so/reference/\n   - Moralis API: https://docs.moralis.io/web3-data-api/evm/reference\n   - DexScreener API: https://docs.dexscreener.com/api/reference\n   - Telethon API: https://docs.telethon.dev/en/stable/\n   - Verify URLs are correctly formatted\n   - Check HTTP methods are appropriate (GET, POST, etc.)\n\n3. **Parameter Validation**: Ensure that:\n   - Required parameters are passed to all function calls\n   - API calls include necessary authentication headers/keys\n   - Function signatures match their definitions\n\n4. **Return Type Checking**: Verify that:\n   - Return types match expectations\n   - Async functions are properly awaited\n   - Error handling is present for API calls\n\n5. **Output Format**: Provide a clear list of issues found with:\n   - File location and line number\n   - Specific issue description\n   - Suggested fix or correction\n   - Severity level (Error/Warning/Info)\n\nFocus on catching errors that would cause runtime failures, API call issues, or incorrect behavior. Be specific and actionable in your recommendations."
+  }
+}

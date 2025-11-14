@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Python Structure Guardian",
+  "description": "Monitors Python files for proper separation of concerns, ensuring configuration, data access, business logic, presentation, and utilities remain properly separated according to best practices",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the modified Python files and verify they follow proper separation of concerns:\n\n1. **Configuration Layer** (config/*.py): Should only contain settings, environment variables, and app setup - no business logic or data access\n2. **Data Access Layer** (data/*.py, core/*_engine.py): Should only handle database/API interactions - no business rules or presentation logic\n3. **Business Logic Layer** (core/*.py, intelligence/*.py): Should contain decision-making, rules, and calculations - no direct I/O or presentation\n4. **Presentation Layer** (main.py, interfaces): Should only handle input/output and orchestration - minimal logic\n5. **Utilities Layer** (utils/*.py): Should contain pure helper functions - no state or side effects\n\nCheck for:\n- Mixed concerns (e.g., business logic in data files, configuration in business logic)\n- Circular dependencies between layers\n- Files exceeding 300 lines that should be split\n- Missing type hints or docstrings\n- Improper dependency direction (should flow: presentation → business → data → utils)\n\nIf violations are found, provide specific refactoring suggestions to properly separate concerns. If the structure is clean, acknowledge the good organization."
+  }
+}

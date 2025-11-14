@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Archive Logs on Start",
+  "description": "Automatically archives all existing log files to a timestamped archive directory and clears the main logs folder when the main application starts, preserving historical logs with a manifest for future reference",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The main.py file has been modified. Please perform the following log archival tasks:\n\n1. Scan the crypto-intelligence/logs/ directory for all .log files\n2. Create crypto-intelligence/logs/archive/ directory if it doesn't exist\n3. For each log file found:\n   - Read file metadata (creation date, size, last modified)\n   - Move the file to archive/ with timestamp prefix format: archived_YYYY-MM-DD_HH-MM-SS_[original_filename].log\n   - Create a manifest entry with: original filename, archive filename, timestamp, file size, original creation date, last modified date\n4. Create or update crypto-intelligence/logs/archive/manifest.json containing:\n   - Array of all archived files with their metadata\n   - Total count of archived files\n   - Total size of all archived files\n   - Last archive operation timestamp\n5. Clear the main logs directory so only the archive/ folder remains\n6. Output a summary report showing:\n   - Number of files archived in this operation\n   - Total size of archived logs (in MB)\n   - Location of archive manifest\n   - List of archived filenames with their new locations\n\nEnsure the manifest.json is properly formatted and includes detailed metadata for easy lookup of historical logs. All operations should be non-destructive - only move files, never delete them."
+  }
+}

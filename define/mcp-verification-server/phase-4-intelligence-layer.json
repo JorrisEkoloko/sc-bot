@@ -1,0 +1,256 @@
+{
+  "phase": "Phase 4: Intelligence Layer (Week 2)",
+  "purpose": "Implement and verify the 6 intelligence components",
+  "duration": "5-7 days",
+  "components": [
+    "MarketAnalyzer",
+    "ChannelReputation",
+    "SignalScorer",
+    "CoinMentionDetector",
+    "TargetedATHChecker",
+    "IntelligenceDataEnricher"
+  ],
+
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions before implementing intelligence components",
+    "questions": [
+      {
+        "id": "Q4.1",
+        "question": "What are the 3 market cap tiers?",
+        "expected_answer": "Micro (< $1M), Small ($1M-$100M), Large (> $100M)",
+        "verification": "Must know tier classification",
+        "reference": "define/intelligence-layer/market-analyzer-implementation.md"
+      },
+      {
+        "id": "Q4.2",
+        "question": "What are the 4 reputation scoring factors?",
+        "expected_answer": "ROI performance (40%), Prediction accuracy (30%), Signal frequency (20%), Consistency (10%)",
+        "verification": "Must know reputation weights",
+        "reference": "define/intelligence-layer/channel-reputation-implementation.md"
+      },
+      {
+        "id": "Q4.3",
+        "question": "What are the 4 factors in holistic confidence scoring?",
+        "expected_answer": "HDRB score (35%), Market intelligence (25%), Channel reputation (25%), Historical correlation (15%)",
+        "verification": "Must know confidence factors",
+        "reference": "define/intelligence-layer/signal-scorer-implementation.md"
+      },
+      {
+        "id": "Q4.4",
+        "question": "What is the purpose of CoinMentionDetector?",
+        "expected_answer": "Extract mentioned coins from messages for targeted ATH checking",
+        "verification": "Must understand purpose",
+        "reference": "define/intelligence-layer/coin-mention-detector-implementation.md"
+      },
+      {
+        "id": "Q4.5",
+        "question": "How does TargetedATHChecker achieve 99% API reduction?",
+        "expected_answer": "Only checks ATH for coins mentioned in messages (2-5 calls vs 500-1000)",
+        "verification": "Must understand optimization",
+        "reference": "define/intelligence-layer/targeted-ath-checker-implementation.md"
+      },
+      {
+        "id": "Q4.6",
+        "question": "What is the purpose of IntelligenceDataEnricher?",
+        "expected_answer": "Cross-component data sharing and unified intelligence context",
+        "verification": "Must understand integration role",
+        "reference": "define/intelligence-layer/intelligence-data-enricher-implementation.md"
+      },
+      {
+        "id": "Q4.7",
+        "question": "Which current file contains market cap intelligence?",
+        "expected_answer": "src/intelligence/market_cap_intelligence.py",
+        "verification": "Must know source file",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q4.8",
+        "question": "Which current file contains channel reputation?",
+        "expected_answer": "src/intelligence/channel_reputation_manager.py",
+        "verification": "Must know source file",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q4.9",
+        "question": "Is intelligence optional or mandatory in new architecture?",
+        "expected_answer": "Mandatory - core feature, not optional",
+        "verification": "Must understand integration requirement",
+        "reference": "define/current-vs-new-architecture-analysis.md"
+      },
+      {
+        "id": "Q4.10",
+        "question": "What is outcome-based learning?",
+        "expected_answer": "Channel reputation updates based on actual trading results (ROI)",
+        "verification": "Must understand learning mechanism",
+        "reference": "define/intelligence-layer/channel-reputation-implementation.md"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Review intelligence layer documentation"
+  },
+
+  "component_verification": {
+    "market_analyzer": {
+      "pre_implementation_checks": [
+        "Have you read src/intelligence/market_cap_intelligence.py?",
+        "Do you understand tier classification logic?",
+        "Do you know risk assessment factors?",
+        "Have you identified sentiment analysis methods?"
+      ],
+      "implementation_verification": [
+        "Are 3 tiers implemented (micro/small/large)?",
+        "Is tier classification accurate?",
+        "Is risk assessment multi-factor?",
+        "Is sentiment analysis integrated?",
+        "Is market intelligence scoring working?"
+      ],
+      "post_implementation_validation": [
+        "Can classify market cap tiers correctly?",
+        "Does risk assessment work?",
+        "Is sentiment analysis accurate?",
+        "Does intelligence scoring integrate with other components?"
+      ]
+    },
+    "channel_reputation": {
+      "pre_implementation_checks": [
+        "Have you read src/intelligence/channel_reputation_manager.py?",
+        "Do you understand outcome-based learning?",
+        "Do you know reputation scoring factors?",
+        "Have you identified tier-specific tracking?"
+      ],
+      "implementation_verification": [
+        "Are 4 reputation factors implemented (40%, 30%, 20%, 10%)?",
+        "Does outcome-based learning work?",
+        "Is tier-specific tracking implemented?",
+        "Does reputation update on trading results?",
+        "Is historical performance tracked?"
+      ],
+      "post_implementation_validation": [
+        "Can track channel performance?",
+        "Does reputation update correctly?",
+        "Is tier-specific data maintained?",
+        "Does learning improve over time?"
+      ]
+    },
+    "signal_scorer": {
+      "pre_implementation_checks": [
+        "Have you read src/intelligence/integrated_signal_scorer.py?",
+        "Do you understand holistic scoring?",
+        "Do you know the 4 confidence factors?",
+        "Have you identified integration points?"
+      ],
+      "implementation_verification": [
+        "Are 4 factors implemented (35%, 25%, 25%, 15%)?",
+        "Does holistic confidence calculation work?",
+        "Is multi-factor integration working?",
+        "Does signal strength assessment work?",
+        "Are confidence thresholds implemented?"
+      ],
+      "post_implementation_validation": [
+        "Does confidence scoring work correctly?",
+        "Are all factors integrated?",
+        "Is signal strength accurate?",
+        "Do thresholds filter correctly?"
+      ]
+    },
+    "coin_mention_detector": {
+      "pre_implementation_checks": [
+        "Have you read src/intelligence/coin_mention_detector.py?",
+        "Do you understand coin extraction logic?",
+        "Do you know symbol standardization?",
+        "Have you identified prediction detection?"
+      ],
+      "implementation_verification": [
+        "Does coin mention extraction work?",
+        "Is symbol standardization implemented?",
+        "Does prediction detection work?",
+        "Is confidence scoring implemented?",
+        "Does context-aware detection work?"
+      ],
+      "post_implementation_validation": [
+        "Can extract mentioned coins accurately?",
+        "Are symbols standardized correctly?",
+        "Are predictions detected?",
+        "Is confidence scoring accurate?"
+      ]
+    },
+    "targeted_ath_checker": {
+      "pre_implementation_checks": [
+        "Have you read src/intelligence/targeted_ath_checker.py?",
+        "Do you understand 99% API reduction logic?",
+        "Do you know symbol-to-tracking lookup?",
+        "Have you identified duplicate prevention?"
+      ],
+      "implementation_verification": [
+        "Does it only check mentioned coins?",
+        "Is symbol-to-tracking lookup working?",
+        "Is duplicate prevention implemented?",
+        "Does it achieve 99% API reduction?",
+        "Is prediction storage working?"
+      ],
+      "post_implementation_validation": [
+        "Are API calls reduced by 99%?",
+        "Does symbol lookup work correctly?",
+        "Does duplicate prevention work?",
+        "Is prediction validation working?"
+      ]
+    },
+    "intelligence_data_enricher": {
+      "pre_implementation_checks": [
+        "Have you read src/intelligence/intelligence_data_enricher.py?",
+        "Do you understand cross-component data sharing?",
+        "Do you know intelligence context storage?",
+        "Have you identified data validation?"
+      ],
+      "implementation_verification": [
+        "Does cross-component data sharing work?",
+        "Is intelligence context stored?",
+        "Is data validation implemented?",
+        "Does unified data flow work?",
+        "Is cleanup logic implemented?"
+      ],
+      "post_implementation_validation": [
+        "Can share data between components?",
+        "Is intelligence context accessible?",
+        "Does data validation work?",
+        "Is data flow unified?"
+      ]
+    }
+  },
+
+  "validation_checklist": {
+    "all_components_implemented": [
+      "MarketAnalyzer - Complete and tested",
+      "ChannelReputation - Complete and tested",
+      "SignalScorer - Complete and tested",
+      "CoinMentionDetector - Complete and tested",
+      "TargetedATHChecker - Complete and tested",
+      "IntelligenceDataEnricher - Complete and tested"
+    ],
+    "intelligence_features_preserved": [
+      "Market cap classification working",
+      "Channel reputation learning active",
+      "Holistic scoring functional",
+      "99% API reduction achieved",
+      "Cross-component integration working"
+    ],
+    "integration_verified": [
+      "Intelligence integrates with core components",
+      "Data flows correctly",
+      "Performance is acceptable",
+      "All features functional"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "All 6 intelligence components implemented",
+      "All component verifications passed",
+      "99% API reduction verified",
+      "All validation checklist items complete"
+    ],
+    "on_pass": "Proceed to Phase 5: Supporting Systems",
+    "on_fail": "Fix failing intelligence components"
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "ambiguous_tickers": {
+    "ONE": {
+      "full_name": "Harmony ONE",
+      "chain": "harmony",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'one of', 'this one', etc."
+    },
+    "LINK": {
+      "full_name": "Chainlink",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'link to', 'click link', etc."
+    },
+    "CAKE": {
+      "full_name": "PancakeSwap",
+      "chain": "bsc",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with food references"
+    },
+    "SAND": {
+      "full_name": "The Sandbox",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'sand beach', etc."
+    },
+    "MAGIC": {
+      "full_name": "Magic",
+      "chain": "arbitrum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with general usage"
+    },
+    "PRIME": {
+      "full_name": "Echelon Prime",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'prime time', 'Amazon Prime', etc."
+    },
+    "BEAM": {
+      "full_name": "Beam",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'beam of light', etc."
+    },
+    "PORTAL": {
+      "full_name": "Portal",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with general usage"
+    },
+    "NEAR": {
+      "full_name": "NEAR Protocol",
+      "chain": "near",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'near future', 'near me', etc."
+    },
+    "ROSE": {
+      "full_name": "Oasis Network",
+      "chain": "oasis",
+      "requires_prefix": false,
+      "reason": "Less common in crypto context, but can cause false positives"
+    },
+    "FLOW": {
+      "full_name": "Flow",
+      "chain": "flow",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'cash flow', 'flow state', etc."
+    },
+    "WAVES": {
+      "full_name": "Waves",
+      "chain": "waves",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'sound waves', 'ocean waves', etc."
+    },
+    "BLUR": {
+      "full_name": "Blur",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with general usage"
+    },
+    "LOOKS": {
+      "full_name": "LooksRare",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common English word - conflicts with 'looks good', 'looks like', etc."
+    },
+    "APE": {
+      "full_name": "ApeCoin",
+      "chain": "ethereum",
+      "requires_prefix": true,
+      "reason": "Common slang word - conflicts with 'ape into', general usage"
+    }
+  },
+  "prefix_patterns": ["$", "#", "\\$"],
+  "detection_rules": {
+    "description": "Rules for detecting ambiguous tickers",
+    "require_prefix": "Ticker must be preceded by $ or # symbol",
+    "all_caps_context": "If in all-caps and surrounded by other known tickers, allow without prefix",
+    "example_valid": ["$ONE", "#ONE", "BTC ETH ONE SOL"],
+    "example_invalid": ["one of the best", "this one", "near future"]
+  }
+}

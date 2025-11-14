@@ -1,0 +1,145 @@
+{
+  "phase": "Phase 2: Migration Planning",
+  "purpose": "Verify understanding of component migration strategy and test preservation",
+  "duration": "1 day",
+
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions about migration strategy",
+    "questions": [
+      {
+        "id": "Q2.1",
+        "question": "Which current file becomes TelegramMonitor?",
+        "expected_answer": "src/telegram/client.py (CryptoTelegramClient)",
+        "verification": "Must know source component",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.2",
+        "question": "Which current file becomes MessageProcessor?",
+        "expected_answer": "src/filtering/message_filter.py (SmartMessageFilter) + src/scoring/research_based_scorer.py",
+        "verification": "Must know source components",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.3",
+        "question": "Which current file becomes AddressExtractor?",
+        "expected_answer": "src/extraction/address_extractor.py (AddressExtractor)",
+        "verification": "Must know source component",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.4",
+        "question": "Which current file becomes PriceEngine?",
+        "expected_answer": "src/price/price_fetcher.py (PriceFetcher)",
+        "verification": "Must know source component",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.5",
+        "question": "Which current file becomes PerformanceTracker?",
+        "expected_answer": "src/tracking/ath_tracker.py (ATHTracker) + src/intelligence/targeted_ath_checker.py",
+        "verification": "Must know source components",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.6",
+        "question": "Which current file becomes DataOutput?",
+        "expected_answer": "src/output/fixed_data_writer.py (FixedDataWriter)",
+        "verification": "Must know source component",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.7",
+        "question": "What are the 3 critical tests to preserve?",
+        "expected_answer": "HDRB model validation, Address extraction accuracy, API failover reliability",
+        "verification": "Must know critical tests",
+        "reference": "define/test-coverage-preservation-plan.md"
+      },
+      {
+        "id": "Q2.8",
+        "question": "What is the migration approach?",
+        "expected_answer": "Refactoring (not rewrite) - preserve all logic, simplify architecture",
+        "verification": "Must understand approach",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.9",
+        "question": "Can you change core algorithms during migration?",
+        "expected_answer": "No - all algorithms must be preserved exactly",
+        "verification": "Must understand preservation requirement",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q2.10",
+        "question": "What is the implementation order?",
+        "expected_answer": "Core (6) → Intelligence (6) → Supporting (5) → Integration (2)",
+        "verification": "Must know correct order",
+        "reference": "define/MASTER-IMPLEMENTATION-GUIDE.md"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Review migration planning documentation"
+  },
+
+  "verification_endpoints": {
+    "verify_component_mapping": {
+      "description": "Verify understanding of component migration mapping",
+      "checks": [
+        "Can map all 6 core components to current files",
+        "Can map all 6 intelligence components to current files",
+        "Understands which components merge",
+        "Understands which components split"
+      ]
+    },
+    "verify_preservation_strategy": {
+      "description": "Verify understanding of what must be preserved",
+      "checks": [
+        "Knows all algorithms must be preserved",
+        "Knows all APIs must be preserved",
+        "Knows all data formats must be preserved",
+        "Knows all integrations must be preserved"
+      ]
+    },
+    "verify_test_strategy": {
+      "description": "Verify understanding of test preservation",
+      "checks": [
+        "Knows which tests are critical",
+        "Knows which tests to consolidate",
+        "Knows which tests to eliminate",
+        "Has plan for test migration"
+      ]
+    }
+  },
+
+  "validation_checklist": {
+    "migration_mapping_complete": [
+      "All 19 new components mapped to current files",
+      "All current functionality accounted for",
+      "No functionality will be lost",
+      "Migration path clear for each component"
+    ],
+    "preservation_strategy_defined": [
+      "List of algorithms to preserve",
+      "List of APIs to preserve",
+      "List of data formats to preserve",
+      "Verification method for each"
+    ],
+    "test_strategy_defined": [
+      "Critical tests identified",
+      "Test consolidation plan created",
+      "Test migration approach defined"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "All verification endpoints passed",
+      "All validation checklist items complete",
+      "Can explain migration for any component",
+      "Confident in preservation strategy"
+    ],
+    "on_pass": "Proceed to Phase 3: Core Foundation",
+    "on_fail": "Review migration planning before proceeding"
+  }
+}

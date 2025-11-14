@@ -1,0 +1,20 @@
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Loaded 1 active signals, 1 completed signals
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Loaded 1 active signals, 1 completed signals
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Fresh start: 0x123... previously tracked (Signal #1: 3.252x), starting Signal #2
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Archived signal 0x123... (Signal #1) to history
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Loaded bootstrap progress: 500/1000 messages processed
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Resuming from message ID: 12345
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Bootstrap complete: Clearing progress file
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Fresh start: 0x123... previously tracked (Signal #1: 0.000x), starting Signal #2
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] Fresh start: 0x123... previously tracked (Signal #2: 0.000x), starting Signal #3
+[2025-11-13 09:53:24] [INFO] [HistoricalBootstrap] HistoricalBootstrap initialized

@@ -1,0 +1,22 @@
+{
+  "description": "Blockscout chain URL mappings for multi-chain support",
+  "note": "Blockscout instances vary by chain. Add base URLs without /api suffix.",
+  "mappings": {
+    "evm": "https://blockscout.com/eth/mainnet",
+    "eth": "https://blockscout.com/eth/mainnet",
+    "ethereum": "https://blockscout.com/eth/mainnet",
+    "bnb": "https://blockscout.com/xdai/mainnet",
+    "bsc": "https://blockscout.com/xdai/mainnet",
+    "matic": "https://blockscout.com/poa/xdai",
+    "polygon": "https://blockscout.com/poa/xdai",
+    "gnosis": "https://blockscout.com/poa/xdai",
+    "xdai": "https://blockscout.com/poa/xdai",
+    "optimism": "https://blockscout.com/optimism/mainnet",
+    "op": "https://blockscout.com/optimism/mainnet",
+    "arbitrum": "https://blockscout.com/arbitrum/one",
+    "arb": "https://blockscout.com/arbitrum/one",
+    "base": "https://blockscout.com/base/mainnet",
+    "avalanche": "https://blockscout.com/avalanche/mainnet",
+    "avax": "https://blockscout.com/avalanche/mainnet"
+  }
+}

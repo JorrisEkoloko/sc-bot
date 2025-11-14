@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Python Architecture Standards Enforcer",
+  "description": "Monitors Python files for proper import organization, method calling patterns, API client separation, layered architecture (interface→core→data), and adherence to the project structure principles",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the modified Python file(s) and verify:\n\n1. **Import Organization**: Check that imports follow the correct order (standard library → third-party → local) with no wildcard imports (from x import *)\n2. **Import Clarity**: Ensure all functions/classes are imported from specific modules, not generic imports\n3. **API Client Separation**: Verify external API calls are wrapped in dedicated client modules (data/api_clients.py or adapters/) with proper error handling, timeouts, and logging\n4. **Layer Architecture**: Confirm the code follows the proper layer pattern:\n   - Interface layer (api/, CLI) handles I/O only\n   - Core layer (core/) contains business logic with no direct I/O\n   - Data layer (data/) handles databases and external APIs\n   - Dependencies flow downward only (interface → core → data)\n5. **Method Calling**: Ensure methods are called from their correct source with proper import paths\n6. **Configuration**: Check that credentials and settings come from config.py or .env, not hardcoded\n7. **Error Handling**: Verify try/except blocks around API calls and database operations with proper logging\n8. **Function Focus**: Confirm each function has a single clear responsibility\n9. **Circular Imports**: Check for any circular dependency patterns\n\nProvide specific feedback on any violations with file locations and suggest corrections that align with the documented architecture in the project structure guides."
+  }
+}

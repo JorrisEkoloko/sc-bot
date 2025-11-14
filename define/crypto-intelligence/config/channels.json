@@ -1,0 +1,9 @@
+{
+  "channels": [
+    {
+      "id": "@erics_calls",
+      "name": "Eric Cryptomans Journal",
+      "enabled": true
+    }
+  ]
+}

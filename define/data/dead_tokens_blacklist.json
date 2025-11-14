@@ -1,0 +1,11 @@
+{
+  "0x6d9350d1e65631a9894f9a9dafb17a54349a3b90": {
+    "address": "0x6d9350d1e65631a9894f9a9dafb17a54349a3b90",
+    "chain": "ethereum",
+    "reason": "Dead LP token: supply 1000 wei (< 10000), likely abandoned pool",
+    "total_supply": "1000",
+    "detected_at": "2025-11-12T17:40:30.902262",
+    "holders": 0,
+    "transfers": 0
+  }
+}

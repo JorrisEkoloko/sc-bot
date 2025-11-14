@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Remove Logging Statements",
+  "description": "Automatically removes all identified logging statements from Python files (print(), logging.debug/info/warning/error(), logger methods) while preserving functionality, syntax, indentation, and code structure. Reports what was removed.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Remove all logging statements from this Python file while:\n1. Preserving all other functionality\n2. Maintaining proper syntax and indentation\n3. Keeping the code structure intact\n4. Not removing comments or documentation\n\nIdentify and remove:\n- print() statements\n- logging.debug(), logging.info(), logging.warning(), logging.error(), logging.critical()\n- logger.debug(), logger.info(), logger.warning(), logger.error(), logger.critical()\n- Any other logger instance method calls (e.g., self.logger.info(), custom_logger.debug())\n\nAfter removing the statements, provide a summary report listing:\n- Total number of logging statements removed\n- Types of logging statements removed (print, logging.X, logger.X)\n- Line numbers where removals occurred\n\nEnsure the resulting code is syntactically correct and maintains all non-logging functionality."
+  }
+}

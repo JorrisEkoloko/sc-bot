@@ -1,0 +1,248 @@
+[2025-11-12 10:05:05] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpzxrkabgk\signal_outcomes.json
+[2025-11-12 10:05:05] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:05:05] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:05:05] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:05:05] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:05:52] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpt92v3q55\signal_outcomes.json
+[2025-11-12 10:05:53] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:05:53] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:05:53] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:05:53] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:06:26] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpedxzb8i3\signal_outcomes.json
+[2025-11-12 10:06:26] [INFO] [AddressExtractor] Address extractor initialized (supports EVM chains + Solana)
+[2025-11-12 10:06:26] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:06:26] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:06:26] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:06:26] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:06:26] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpzcgn7id7\signal_outcomes.json
+[2025-11-12 10:07:22] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpks0svfbk\signal_outcomes.json
+[2025-11-12 10:07:23] [INFO] [AddressExtractor] Address extractor initialized (supports EVM chains + Solana)
+[2025-11-12 10:07:23] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:07:23] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:07:23] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:07:23] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:07:23] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpk931ahu0\signal_outcomes.json
+[2025-11-12 10:07:34] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpxn28f43c\signal_outcomes.json
+[2025-11-12 10:07:34] [INFO] [AddressExtractor] Address extractor initialized (supports EVM chains + Solana)
+[2025-11-12 10:07:34] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:07:34] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:07:34] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:07:34] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:07:34] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmp2zxyb6v5\signal_outcomes.json
+[2025-11-12 10:07:59] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmp4qu9yzzx\signal_outcomes.json
+[2025-11-12 10:07:59] [INFO] [AddressExtractor] Address extractor initialized (supports EVM chains + Solana)
+[2025-11-12 10:07:59] [INFO] [AddressExtractor] Found 1 addresses: 1 evm
+[2025-11-12 10:07:59] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:07:59] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:07:59] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:07:59] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:07:59] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:07:59] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:07:59] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:07:59] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:07:59] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpg56mqd22\signal_outcomes.json
+[2025-11-12 10:14:52] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmpgzj3111k\signal_outcomes.json
+[2025-11-12 10:14:52] [INFO] [AddressExtractor] Address extractor initialized (supports EVM chains + Solana)
+[2025-11-12 10:14:52] [INFO] [AddressExtractor] Found 1 addresses: 1 evm
+[2025-11-12 10:14:52] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:14:52] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:14:52] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:14:52] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:14:53] [WARNING] [CryptoDetector] Patterns file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_patterns.json
+[2025-11-12 10:14:53] [WARNING] [CryptoDetector] Keywords file not found: C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\services\config\crypto_keywords.json
+[2025-11-12 10:14:53] [INFO] [CryptoDetector] Crypto detector initialized (0 tickers, 0 keywords)
+[2025-11-12 10:14:53] [ERROR] [CryptoDetector] CryptoDetector initialized with no patterns or keywords - detector is non-functional
+[2025-11-12 10:14:53] [INFO] [OutcomeRepository] Loaded 1 outcomes from C:\Users\jorri\AppData\Local\Temp\tmp7g316mw1\signal_outcomes.json
+[2025-11-12 10:18:25] [INFO] [CryptoDetector] Loaded 139 tickers from crypto_patterns.json
+[2025-11-12 10:18:25] [INFO] [CryptoDetector] Loaded 382 unique keywords from 15 categories
+[2025-11-12 10:18:25] [INFO] [CryptoDetector] Crypto detector initialized (139 tickers, 382 keywords)
+[2025-11-12 10:18:39] [INFO] [CryptoDetector] Loaded 139 tickers from crypto_patterns.json
+[2025-11-12 10:18:39] [INFO] [CryptoDetector] Loaded 382 unique keywords from 15 categories
+[2025-11-12 10:18:39] [INFO] [CryptoDetector] Crypto detector initialized (139 tickers, 382 keywords)
+[2025-11-12 16:47:14] [INFO] [TestOptimusROI] Loaded symbol mapping for 12987 tokens
+[2025-11-12 16:47:14] [INFO] [TestOptimusROI] HistoricalPriceRetriever initialized
+[2025-11-12 16:47:14] [INFO] [TestOptimusROI] Symbol mapping: OPTIMUS → OPTI (for coingecko, address 0x562e3628...)
+[2025-11-12 16:47:14] [INFO] [TestOptimusROI] Fetching closest entry price for OPTIMUS at 2025-11-05 16:47:14.459119
+[2025-11-12 16:47:14] [INFO] [TestOptimusROI] CoinMarketCap found metadata for 0x562e362876c8aee4744fc2c6aac8394c312d215d: OPTI
+[2025-11-12 16:47:14] [INFO] [TestOptimusROI] Symbol mapping: OPTIMUS → OPTI (from CoinMarketCap)
+[2025-11-12 16:47:15] [INFO] [TestOptimusROI] ✓ Found exact price at message time: $0.003119
+[2025-11-12 16:47:15] [INFO] [TestOptimusROI] Fetching forward OHLC for OPTIMUS from 2025-11-05 16:47:14.459119 (30 days)
+[2025-11-12 16:47:15] [WARNING] [TestOptimusROI] No OHLC data found for OPTIMUS starting 2025-11-05 16:47:14.459119
+[2025-11-12 16:47:15] [WARNING] [TestOptimusROI] No OHLC data found for OPTIMUS
+[2025-11-12 16:47:22] [INFO] [TestOptimusROI] Loaded symbol mapping for 12987 tokens
+[2025-11-12 16:47:22] [INFO] [TestOptimusROI] HistoricalPriceRetriever initialized
+[2025-11-12 16:47:22] [INFO] [TestOptimusROI] Symbol mapping: OPTIMUS → OPTI (for coingecko, address 0x562e3628...)
+[2025-11-12 16:47:22] [INFO] [TestOptimusROI] Fetching closest entry price for OPTIMUS at 2025-11-05 16:47:22.718227
+[2025-11-12 16:47:23] [INFO] [TestOptimusROI] CoinMarketCap found metadata for 0x562e362876c8aee4744fc2c6aac8394c312d215d: OPTI
+[2025-11-12 16:47:23] [INFO] [TestOptimusROI] Symbol mapping: OPTIMUS → OPTI (from CoinMarketCap)
+[2025-11-12 16:47:23] [INFO] [TestOptimusROI] ✓ Found exact price at message time: $0.003119
+[2025-11-12 16:57:23] [WARNING] [TestNewFlow] Symbol mapping file not found: data/symbol_mapping.json
+[2025-11-12 16:57:23] [INFO] [TestNewFlow] HistoricalPriceRetriever initialized
+[2025-11-12 16:57:23] [INFO] [TestNewFlow] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 16:57:23] [INFO] [TestNewFlow] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 16:57:23] [INFO] [TestNewFlow] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 16:57:24] [INFO] [TestNewFlow] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 16:57:24] [INFO] [TestNewFlow] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 16:57:24] [INFO] [TestNewFlow] Calculating 6 checkpoint ROIs from 31 candles
+[2025-11-12 16:57:24] [INFO] [TestNewFlow] Fetching closest entry price for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 16:57:24] [WARNING] [TestNewFlow] CoinMarketCap HTTP 400: {"status":{"timestamp":"2025-11-12T21:57:24.568Z","error_code":400,"error_message":"No items found.","elapsed":0,"credit_count":0,"notice":null}}
+[2025-11-12 16:57:24] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 16:57:24] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 16:57:25] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 22:37:31
+[2025-11-12 16:57:25] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 00:37:31
+[2025-11-12 16:57:25] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 17:37:31
+[2025-11-12 16:57:25] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 05:37:31
+[2025-11-12 16:57:25] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-15 23:37:31
+[2025-11-12 16:57:25] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 23:37:31
+[2025-11-12 16:57:25] [INFO] [TestNewFlow] Trying DexScreener for small token OPTIMUS (0x562E3628...)
+[2025-11-12 16:57:26] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 16:57:26] [WARNING] [TestNewFlow] [WARNING] No historical price found for OPTIMUS within +/-24h of 2023-11-16 23:37:31
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] Loaded 1 cached historical prices
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] HistoricalPriceRetriever initialized
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] Calculating 6 checkpoint ROIs from 31 candles
+[2025-11-12 17:01:56] [INFO] [TestNewFlow] Fetching closest entry price for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:01:57] [WARNING] [TestNewFlow] CoinMarketCap HTTP 400: {"status":{"timestamp":"2025-11-12T22:01:57.501Z","error_code":400,"error_message":"No items found.","elapsed":0,"credit_count":0,"notice":null}}
+[2025-11-12 17:01:57] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 17:01:57] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:01:57] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 22:37:31
+[2025-11-12 17:01:57] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 00:37:31
+[2025-11-12 17:01:58] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 17:37:31
+[2025-11-12 17:01:58] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 05:37:31
+[2025-11-12 17:01:58] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-15 23:37:31
+[2025-11-12 17:01:58] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 23:37:31
+[2025-11-12 17:01:58] [INFO] [TestNewFlow] Trying DexScreener for small token OPTIMUS (0x562E3628...)
+[2025-11-12 17:01:58] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 17:01:58] [WARNING] [TestNewFlow] [WARNING] No historical price found for OPTIMUS within +/-24h of 2023-11-16 23:37:31
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] Loaded 1 cached historical prices
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] HistoricalPriceRetriever initialized
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] Calculating 6 checkpoint ROIs from 31 candles
+[2025-11-12 17:02:32] [INFO] [TestNewFlow] Fetching closest entry price for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:02:32] [WARNING] [TestNewFlow] CoinMarketCap HTTP 400: {"status":{"timestamp":"2025-11-12T22:02:33.187Z","error_code":400,"error_message":"No items found.","elapsed":0,"credit_count":0,"notice":null}}
+[2025-11-12 17:02:33] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 17:02:33] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:02:33] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 22:37:31
+[2025-11-12 17:02:33] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 00:37:31
+[2025-11-12 17:02:33] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 17:37:31
+[2025-11-12 17:02:34] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 05:37:31
+[2025-11-12 17:02:34] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-15 23:37:31
+[2025-11-12 17:02:34] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 23:37:31
+[2025-11-12 17:02:34] [INFO] [TestNewFlow] Trying DexScreener for small token OPTIMUS (0x562E3628...)
+[2025-11-12 17:02:35] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 17:02:35] [WARNING] [TestNewFlow] [WARNING] No historical price found for OPTIMUS within +/-24h of 2023-11-16 23:37:31
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] Loaded 1 cached historical prices
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] HistoricalPriceRetriever initialized
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] Calculating 6 checkpoint ROIs from 31 candles
+[2025-11-12 17:03:06] [INFO] [TestNewFlow] Fetching closest entry price for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:03:06] [WARNING] [TestNewFlow] CoinMarketCap HTTP 400: {"status":{"timestamp":"2025-11-12T22:03:07.234Z","error_code":400,"error_message":"No items found.","elapsed":0,"credit_count":0,"notice":null}}
+[2025-11-12 17:03:07] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 17:03:07] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:03:07] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 22:37:31
+[2025-11-12 17:03:07] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 00:37:31
+[2025-11-12 17:03:07] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-16 17:37:31
+[2025-11-12 17:03:08] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 05:37:31
+[2025-11-12 17:03:08] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-15 23:37:31
+[2025-11-12 17:03:08] [WARNING] [TestNewFlow] No historical price found for OPTIMUS at 2023-11-17 23:37:31
+[2025-11-12 17:03:08] [INFO] [TestNewFlow] Trying DexScreener for small token OPTIMUS (0x562E3628...)
+[2025-11-12 17:03:09] [WARNING] [TestNewFlow] DexScreener: No pairs found for 0x562E36288a9Dd867d5d8b0Aa48c2E8d2d215d5d
+[2025-11-12 17:03:09] [WARNING] [TestNewFlow] [WARNING] No historical price found for OPTIMUS within +/-24h of 2023-11-16 23:37:31
+[2025-11-12 17:05:01] [INFO] [TestNewFlow] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:05:01] [INFO] [TestNewFlow] Loaded 1 cached historical prices
+[2025-11-12 17:05:01] [INFO] [TestNewFlow] HistoricalPriceRetriever initialized
+[2025-11-12 17:05:01] [INFO] [TestNewFlow] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] Calculating 6 checkpoint ROIs from 31 candles
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] Fetching closest entry price for OPTIMUS at 2023-11-16 23:37:31
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] Symbol mapping: OPTIMUS → OPTI (for cryptocompare, address 0x562e3628...)
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] Symbol mapping: OPTIMUS → OPTI (from local mapping)
+[2025-11-12 17:05:02] [INFO] [TestNewFlow] [OK] Found exact price at message time: $0.001084
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] HistoricalPriceRetriever initialized
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] Loaded 1 cached historical prices
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] HistoricalPriceRetriever initialized
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] Fetching forward OHLC for BTC from 2024-01-01 12:00:00 (30 days)
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] CryptoCompare: BTC - 31 candles, ATH $49054.050000 on day 10.0
+[2025-11-12 17:12:59] [INFO] [Test1_CachePersistence] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:12:59] [INFO] [Test2_TwelveDataFallback] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:12:59] [INFO] [Test2_TwelveDataFallback] HistoricalPriceRetriever initialized
+[2025-11-12 17:12:59] [INFO] [Test2_TwelveDataFallback] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:13:00] [INFO] [Test2_TwelveDataFallback] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] HistoricalPriceRetriever initialized
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] Fetching forward OHLC for BTC from 2025-11-10 17:13:00.334327 (2 days)
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] CryptoCompare: BTC - 3 candles, ATH $107489.750000 on day 1.0
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] [OK] Found 3/2 candles (100.0% complete)
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] Fetching forward OHLC for ETH from 2025-11-02 17:13:00.334327 (10 days)
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] CryptoCompare: ETH - 11 candles, ATH $3917.190000 on day 0.0
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] [OK] Found 11/10 candles (100.0% complete)
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] Fetching forward OHLC for SOL from 2025-10-08 17:13:00.334327 (30 days)
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] CryptoCompare: SOL - 31 candles, ATH $229.770000 on day 0.0
+[2025-11-12 17:13:00] [INFO] [Test3_SmartCheckpoints] [OK] Found 31/30 candles (100.0% complete)
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] HistoricalPriceRetriever initialized
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] Fetching closest entry price for ETH at 2024-01-01 12:00:00
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] Fetching closest entry price for SOL at 2024-01-01 12:00:00
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] Fetching closest entry price for MATIC at 2024-01-01 12:00:00
+[2025-11-12 17:13:00] [INFO] [Test4_BatchProcessing] Fetching closest entry price for AVAX at 2024-01-01 12:00:00
+[2025-11-12 17:13:01] [INFO] [Test4_BatchProcessing] [OK] Found exact price at message time: $2352.650000
+[2025-11-12 17:13:01] [INFO] [Test4_BatchProcessing] [OK] Found exact price at message time: $41.940000
+[2025-11-12 17:13:01] [INFO] [Test4_BatchProcessing] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:13:01] [INFO] [Test4_BatchProcessing] [OK] Found exact price at message time: $110.020000
+[2025-11-12 17:13:01] [INFO] [Test4_BatchProcessing] [OK] Found exact price at message time: $1.016000
+[2025-11-12 17:13:01] [INFO] [Test5_RateLimiting] Loaded symbol mapping for 12987 tokens
+[2025-11-12 17:13:01] [INFO] [Test5_RateLimiting] HistoricalPriceRetriever initialized
+[2025-11-12 17:13:01] [INFO] [Test5_RateLimiting] Fetching closest entry price for BTC at 2024-01-01 12:00:00
+[2025-11-12 17:13:01] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $44197.610000
+[2025-11-12 17:13:01] [INFO] [Test5_RateLimiting] Fetching closest entry price for ETH at 2024-01-01 12:00:00
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $2352.650000
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] Fetching closest entry price for SOL at 2024-01-01 12:00:00
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $110.020000
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] Fetching closest entry price for MATIC at 2024-01-01 12:00:00
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $1.016000
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] Fetching closest entry price for AVAX at 2024-01-01 12:00:00
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $41.940000
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] Fetching closest entry price for LINK at 2024-01-01 12:00:00
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $15.560000
+[2025-11-12 17:13:02] [INFO] [Test5_RateLimiting] Fetching closest entry price for UNI at 2024-01-01 12:00:00
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $7.604000
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] Fetching closest entry price for AAVE at 2024-01-01 12:00:00
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $116.220000
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] Fetching closest entry price for CRV at 2024-01-01 12:00:00
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $0.628900
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] Fetching closest entry price for SNX at 2024-01-01 12:00:00
+[2025-11-12 17:13:03] [INFO] [Test5_RateLimiting] [OK] Found exact price at message time: $4.089000
+[2025-11-12 17:39:46] [INFO] [DeadTokenDetector] No existing blacklist found, starting fresh
+[2025-11-12 17:40:30] [INFO] [DeadTokenDetector] No existing blacklist found, starting fresh
+[2025-11-12 17:40:30] [INFO] [DeadTokenDetector] Saved 1 dead tokens to blacklist
+[2025-11-12 17:40:30] [WARNING] [DeadTokenDetector] [DEAD TOKEN] Blacklisted 0x6d9350d1...: Dead LP token: supply 1000 wei (< 10000), likely abandoned pool
+[2025-11-12 17:44:18] [INFO] [DeadTokenDetector] Loaded 1 dead tokens from blacklist
+[2025-11-12 17:44:18] [INFO] [DeadTokenDetector] Token 0x6d9350d1... already blacklisted: Dead LP token: supply 1000 wei (< 10000), likely abandoned pool
+[2025-11-12 17:47:44] [INFO] [DeadTokenDetector] Loaded 1 dead tokens from blacklist
+[2025-11-12 17:47:44] [INFO] [DeadTokenDetector] Token 0x6d9350d1... already blacklisted: Dead LP token: supply 1000 wei (< 10000), likely abandoned pool
+[2025-11-12 17:47:50] [INFO] [DeadTokenDetector] Loaded 1 dead tokens from blacklist
+[2025-11-12 17:47:50] [INFO] [DeadTokenDetector] Token 0x6d9350d1... already blacklisted: Dead LP token: supply 1000 wei (< 10000), likely abandoned pool

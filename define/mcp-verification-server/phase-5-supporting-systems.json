@@ -1,0 +1,233 @@
+{
+  "phase": "Phase 5: Supporting Systems (Week 3)",
+  "purpose": "Implement discovery, validation, and utility systems",
+  "duration": "5-7 days",
+  "components": [
+    "ActiveCoinsCollector",
+    "ChannelDatabaseReader",
+    "RealWorldDataProvider",
+    "StatisticalValidationEngine",
+    "EnhancedUtilities"
+  ],
+
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions about supporting systems",
+    "questions": [
+      {
+        "id": "Q5.1",
+        "question": "What is the purpose of ActiveCoinsCollector?",
+        "expected_answer": "Historical channel scanning to collect active coins",
+        "verification": "Must understand purpose",
+        "reference": "define/discovery-system/active-coins-collector-implementation.md"
+      },
+      {
+        "id": "Q5.2",
+        "question": "What is the purpose of ChannelDatabaseReader?",
+        "expected_answer": "Read and integrate discovered channels into monitoring",
+        "verification": "Must understand purpose",
+        "reference": "define/discovery-system/channel-database-reader-implementation.md"
+      },
+      {
+        "id": "Q5.3",
+        "question": "What is the purpose of RealWorldDataProvider?",
+        "expected_answer": "Provide live data integration and quality validation",
+        "verification": "Must understand purpose",
+        "reference": "define/validation-system/real-world-data-provider-implementation.md"
+      },
+      {
+        "id": "Q5.4",
+        "question": "What are the 3 HDRB compliance benchmarks?",
+        "expected_answer": "77% accuracy, 70% correlation, p < 0.05 significance",
+        "verification": "Must know exact benchmarks",
+        "reference": "define/validation-system/statistical-validation-engine-implementation.md"
+      },
+      {
+        "id": "Q5.5",
+        "question": "What are the 3 enhanced utilities?",
+        "expected_answer": "Error handling, Rate limiting, System monitoring",
+        "verification": "Must know utility types",
+        "reference": "define/utils-layer/enhanced-utilities-implementation.md"
+      },
+      {
+        "id": "Q5.6",
+        "question": "What is the error handling retry pattern?",
+        "expected_answer": "3 retries with exponential backoff",
+        "verification": "Must know retry logic",
+        "reference": "src/utils/comprehensive_error_handler.py"
+      },
+      {
+        "id": "Q5.7",
+        "question": "What is the circuit breaker failure threshold?",
+        "expected_answer": "5 failures before tripping",
+        "verification": "Must know circuit breaker config",
+        "reference": "src/utils/api_circuit_breaker.py"
+      },
+      {
+        "id": "Q5.8",
+        "question": "What is the circuit breaker recovery timeout?",
+        "expected_answer": "60 seconds",
+        "verification": "Must know recovery time",
+        "reference": "src/utils/api_circuit_breaker.py"
+      },
+      {
+        "id": "Q5.9",
+        "question": "Which current file contains the statistical validation engine?",
+        "expected_answer": "src/validation/statistical_validation_engine.py",
+        "verification": "Must know source file",
+        "reference": "define/component-migration-matrix.md"
+      },
+      {
+        "id": "Q5.10",
+        "question": "Are supporting systems optional or required?",
+        "expected_answer": "Required - essential for validation and reliability",
+        "verification": "Must understand importance",
+        "reference": "define/MASTER-IMPLEMENTATION-GUIDE.md"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Review supporting systems documentation"
+  },
+
+  "component_verification": {
+    "active_coins_collector": {
+      "pre_implementation_checks": [
+        "Have you read src/collection/active_coins_collector.py?",
+        "Do you understand historical scanning?",
+        "Do you know coin tracking logic?",
+        "Have you identified data collection methods?"
+      ],
+      "implementation_verification": [
+        "Does historical scanning work?",
+        "Is coin tracking implemented?",
+        "Is data collection accurate?",
+        "Does integration with main system work?"
+      ],
+      "post_implementation_validation": [
+        "Can scan historical messages?",
+        "Are active coins collected?",
+        "Is data accurate?",
+        "Does integration work?"
+      ]
+    },
+    "channel_database_reader": {
+      "pre_implementation_checks": [
+        "Have you read src/discovery/channel_database_reader.py?",
+        "Do you understand channel discovery?",
+        "Do you know integration logic?",
+        "Have you identified database reading?"
+      ],
+      "implementation_verification": [
+        "Does channel reading work?",
+        "Is discovery integration implemented?",
+        "Does database access work?",
+        "Is channel validation implemented?"
+      ],
+      "post_implementation_validation": [
+        "Can read channel database?",
+        "Are channels integrated correctly?",
+        "Does validation work?",
+        "Is discovery functional?"
+      ]
+    },
+    "real_world_data_provider": {
+      "pre_implementation_checks": [
+        "Have you read src/real_world_testing/real_world_data_provider.py?",
+        "Do you understand live data integration?",
+        "Do you know data quality validation?",
+        "Have you identified performance benchmarking?"
+      ],
+      "implementation_verification": [
+        "Does live data integration work?",
+        "Is data quality validation implemented?",
+        "Does performance benchmarking work?",
+        "Is real-world testing supported?"
+      ],
+      "post_implementation_validation": [
+        "Can provide live data?",
+        "Is data quality validated?",
+        "Are benchmarks tracked?",
+        "Does testing work?"
+      ]
+    },
+    "statistical_validation_engine": {
+      "pre_implementation_checks": [
+        "Have you read src/validation/statistical_validation_engine.py?",
+        "Do you understand HDRB compliance validation?",
+        "Do you know the 3 benchmarks (77%, 70%, p<0.05)?",
+        "Have you identified statistical methods?"
+      ],
+      "implementation_verification": [
+        "Is HDRB compliance validation implemented?",
+        "Are 3 benchmarks checked (77% accuracy, 70% correlation, p<0.05)?",
+        "Are statistical methods correct?",
+        "Does research compliance work?",
+        "Is performance tracking implemented?"
+      ],
+      "post_implementation_validation": [
+        "Does HDRB validation work?",
+        "Are benchmarks met?",
+        "Is statistical analysis accurate?",
+        "Is compliance verified?"
+      ]
+    },
+    "enhanced_utilities": {
+      "pre_implementation_checks": [
+        "Have you read src/utils/comprehensive_error_handler.py?",
+        "Have you read src/utils/enhanced_rate_limiter.py?",
+        "Have you read src/utils/system_monitor.py?",
+        "Do you understand all utility functions?"
+      ],
+      "implementation_verification": [
+        "Is error handling with 3 retries implemented?",
+        "Is exponential backoff implemented?",
+        "Are circuit breakers implemented (5 failures, 60s recovery)?",
+        "Is rate limiting per-API implemented?",
+        "Is system monitoring implemented?",
+        "Is resource management implemented?"
+      ],
+      "post_implementation_validation": [
+        "Does error handling work correctly?",
+        "Do circuit breakers trip and recover?",
+        "Does rate limiting prevent overuse?",
+        "Is system monitoring accurate?",
+        "Is resource management effective?"
+      ]
+    }
+  },
+
+  "validation_checklist": {
+    "all_systems_implemented": [
+      "ActiveCoinsCollector - Complete and tested",
+      "ChannelDatabaseReader - Complete and tested",
+      "RealWorldDataProvider - Complete and tested",
+      "StatisticalValidationEngine - Complete and tested",
+      "EnhancedUtilities - Complete and tested"
+    ],
+    "functionality_verified": [
+      "Discovery system working",
+      "Validation system working",
+      "HDRB compliance verified",
+      "Error handling robust",
+      "Rate limiting effective",
+      "Monitoring accurate"
+    ],
+    "integration_verified": [
+      "Supporting systems integrate with core",
+      "Validation works correctly",
+      "Utilities are used throughout",
+      "Performance is acceptable"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "All 5 supporting systems implemented",
+      "All component verifications passed",
+      "HDRB compliance validated",
+      "All validation checklist items complete"
+    ],
+    "on_pass": "Proceed to Phase 6: System Integration",
+    "on_fail": "Fix failing supporting systems"
+  }
+}

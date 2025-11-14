@@ -1,0 +1,207 @@
+{
+  "phase": "Phase 6: System Integration (Week 4)",
+  "purpose": "Integrate all components and create main orchestration",
+  "duration": "5-7 days",
+  "components": ["ConfigurationManagement", "MainOrchestration"],
+
+  "pre_phase_questionnaire": {
+    "instructions": "Answer ALL questions about system integration",
+    "questions": [
+      {
+        "id": "Q6.1",
+        "question": "What is the target line count for main.py?",
+        "expected_answer": "< 500 lines (vs current 4,135)",
+        "verification": "Must know target",
+        "reference": "define/system-integration/main-orchestration-implementation.md"
+      },
+      {
+        "id": "Q6.2",
+        "question": "How many background tasks should main orchestration have?",
+        "expected_answer": "3 tasks (message processing, price updates, data output)",
+        "verification": "Must know task structure",
+        "reference": "define/system-integration/main-orchestration-implementation.md"
+      },
+      {
+        "id": "Q6.3",
+        "question": "What configuration class should be used?",
+        "expected_answer": "Unified Config class loading from .env",
+        "verification": "Must know configuration approach",
+        "reference": "define/system-integration/configuration-management-implementation.md"
+      },
+      {
+        "id": "Q6.4",
+        "question": "Are all environment variables from current .env compatible?",
+        "expected_answer": "Yes - 100% compatible, zero changes needed",
+        "verification": "Must understand compatibility",
+        "reference": "define/actual-env-configuration-guide.md"
+      },
+      {
+        "id": "Q6.5",
+        "question": "What is the message processing loop pattern?",
+        "expected_answer": "Async loop: get message → process → extract → fetch price → track → output",
+        "verification": "Must know pipeline flow",
+        "reference": "define/system-integration/main-orchestration-implementation.md"
+      },
+      {
+        "id": "Q6.6",
+        "question": "What is the price update interval?",
+        "expected_answer": "2 hours (7200 seconds)",
+        "verification": "Must know update frequency",
+        "reference": "src/tracking/ath_tracker.py"
+      },
+      {
+        "id": "Q6.7",
+        "question": "How should graceful shutdown be handled?",
+        "expected_answer": "Signal handlers (SIGINT, SIGTERM) to stop all tasks cleanly",
+        "verification": "Must know shutdown pattern",
+        "reference": "define/system-integration/main-orchestration-implementation.md"
+      },
+      {
+        "id": "Q6.8",
+        "question": "How many components need to be initialized?",
+        "expected_answer": "19 components (6 core + 6 intelligence + 5 supporting + 2 integration)",
+        "verification": "Must know all components",
+        "reference": "define/complete-pipeline-coverage-summary.md"
+      },
+      {
+        "id": "Q6.9",
+        "question": "Should components be tightly or loosely coupled?",
+        "expected_answer": "Loosely coupled - clean interfaces between components",
+        "verification": "Must understand architecture principle",
+        "reference": "define/crypto-intelligence-rebuild.md"
+      },
+      {
+        "id": "Q6.10",
+        "question": "What happens if a component fails?",
+        "expected_answer": "Graceful degradation - system continues with reduced functionality",
+        "verification": "Must understand error handling",
+        "reference": "define/system-integration/main-orchestration-implementation.md"
+      }
+    ],
+    "passing_score": "10/10 required",
+    "on_failure": "Review integration documentation"
+  },
+
+  "component_verification": {
+    "configuration_management": {
+      "pre_implementation_checks": [
+        "Have you read src/config.py?",
+        "Do you understand environment variable loading?",
+        "Do you know all required variables?",
+        "Have you identified validation logic?"
+      ],
+      "implementation_verification": [
+        "Does Config class load all environment variables?",
+        "Is validation implemented for required variables?",
+        "Are defaults provided for optional variables?",
+        "Is configuration accessible to all components?",
+        "Are environment-specific overrides supported?"
+      ],
+      "post_implementation_validation": [
+        "Can load configuration successfully?",
+        "Does validation catch missing variables?",
+        "Are defaults applied correctly?",
+        "Can all components access configuration?",
+        "Do overrides work?"
+      ]
+    },
+    "main_orchestration": {
+      "pre_implementation_checks": [
+        "Have you read src/main.py (current)?",
+        "Do you understand the pipeline flow?",
+        "Do you know all component initialization?",
+        "Have you identified background tasks?"
+      ],
+      "implementation_verification": [
+        "Is main.py under 500 lines?",
+        "Are all 19 components initialized?",
+        "Are 3 background tasks implemented?",
+        "Is message processing loop async?",
+        "Is price update loop async?",
+        "Is data output loop async?",
+        "Is graceful shutdown implemented?",
+        "Is error handling comprehensive?",
+        "Are components loosely coupled?"
+      ],
+      "post_implementation_validation": [
+        "Does system start successfully?",
+        "Do all components initialize?",
+        "Do background tasks run?",
+        "Does message processing work end-to-end?",
+        "Do price updates occur every 2 hours?",
+        "Does data output work?",
+        "Does graceful shutdown work?",
+        "Does error handling prevent crashes?"
+      ]
+    }
+  },
+
+  "integration_testing": {
+    "end_to_end_flow": {
+      "description": "Test complete message processing flow",
+      "steps": [
+        "1. Telegram message received",
+        "2. Message processed through HDRB",
+        "3. Addresses extracted",
+        "4. Prices fetched from APIs",
+        "5. Performance tracked",
+        "6. Data output to CSV and Sheets"
+      ],
+      "validation": "All steps complete successfully"
+    },
+    "component_communication": {
+      "description": "Verify components communicate correctly",
+      "checks": [
+        "TelegramMonitor → MessageProcessor",
+        "MessageProcessor → AddressExtractor",
+        "AddressExtractor → PriceEngine",
+        "PriceEngine → PerformanceTracker",
+        "PerformanceTracker → DataOutput",
+        "Intelligence components integrate throughout"
+      ]
+    },
+    "error_scenarios": {
+      "description": "Test error handling and graceful degradation",
+      "scenarios": [
+        "API failure - system continues with fallback",
+        "Component failure - system degrades gracefully",
+        "Network issue - system retries appropriately",
+        "Invalid data - system handles without crash"
+      ]
+    }
+  },
+
+  "validation_checklist": {
+    "integration_complete": [
+      "Configuration management working",
+      "Main orchestration under 500 lines",
+      "All 19 components initialized",
+      "All background tasks running",
+      "Graceful shutdown working"
+    ],
+    "end_to_end_verified": [
+      "Complete message flow works",
+      "All components communicate",
+      "Data flows correctly",
+      "Output is generated"
+    ],
+    "error_handling_verified": [
+      "API failures handled",
+      "Component failures handled",
+      "Graceful degradation works",
+      "System remains stable"
+    ]
+  },
+
+  "progression_gate": {
+    "requirements": [
+      "10/10 on pre-phase questionnaire",
+      "Main.py under 500 lines",
+      "All components integrated",
+      "End-to-end flow working",
+      "All validation checklist items complete"
+    ],
+    "on_pass": "Proceed to Phase 7: Production Deployment",
+    "on_fail": "Fix integration issues before proceeding"
+  }
+}
