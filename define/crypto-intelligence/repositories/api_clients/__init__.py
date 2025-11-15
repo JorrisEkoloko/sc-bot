@@ -1,5 +1,4 @@
 """API clients for external data sources."""
-from domain.price_data import PriceData
 from repositories.api_clients.base_client import BaseAPIClient
 from repositories.api_clients.coingecko_client import CoinGeckoClient
 from repositories.api_clients.birdeye_client import BirdeyeClient
@@ -14,7 +13,6 @@ from repositories.api_clients.cryptocompare_historical_client import CryptoCompa
 from repositories.api_clients.defillama_historical_client import DefiLlamaHistoricalClient
 
 __all__ = [
-    'PriceData',
     'BaseAPIClient',
     'CoinGeckoClient',
     'BirdeyeClient',

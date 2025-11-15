@@ -249,3 +249,69 @@ class ReputationCalculator:
             'avg_roi': avg_roi,
             'sharpe_ratio': sharpe_ratio
         }
+
+    @staticmethod
+    def calculate_timing_patterns(outcomes: List[SignalOutcome]) -> dict:
+        """
+        Calculate timing pattern metrics for channel reputation.
+        
+        Analyzes when signals peak (early vs late) and crash rates to help
+        traders understand optimal exit timing for each channel.
+        
+        Args:
+            outcomes: List of completed signal outcomes
+            
+        Returns:
+            dict: Timing pattern metrics with keys:
+                - early_peaker_percentage: % of signals that peak within 7 days
+                - late_peaker_percentage: % of signals that peak after 7 days
+                - average_days_to_ath: Mean days to reach ATH
+                - crash_rate_after_day_7: % of signals that crash from day 7 to day 30
+                - recommended_hold_period: Trading recommendation string
+        """
+        if not outcomes:
+            return {
+                'early_peaker_percentage': 0.0,
+                'late_peaker_percentage': 0.0,
+                'average_days_to_ath': 0.0,
+                'crash_rate_after_day_7': 0.0,
+                'recommended_hold_period': 'Insufficient data'
+            }
+        
+        # Count early vs late peakers
+        early_peakers = sum(1 for o in outcomes if o.peak_timing == 'early_peaker')
+        late_peakers = sum(1 for o in outcomes if o.peak_timing == 'late_peaker')
+        total_with_timing = early_peakers + late_peakers
+        
+        if total_with_timing == 0:
+            early_peaker_pct = 0.0
+            late_peaker_pct = 0.0
+        else:
+            early_peaker_pct = (early_peakers / total_with_timing) * 100
+            late_peaker_pct = (late_peakers / total_with_timing) * 100
+        
+        # Calculate average days to ATH
+        days_to_ath_values = [o.days_to_ath for o in outcomes if o.days_to_ath > 0]
+        avg_days_to_ath = statistics.mean(days_to_ath_values) if days_to_ath_values else 0.0
+        
+        # Count crashes after day 7
+        crashed_signals = sum(1 for o in outcomes if o.trajectory == 'crashed')
+        crash_rate = (crashed_signals / len(outcomes)) * 100 if outcomes else 0.0
+        
+        # Determine recommended hold period
+        if total_with_timing == 0:
+            recommended = 'Insufficient timing data'
+        elif early_peaker_pct > 70:
+            recommended = 'Exit early (1-7 days)'
+        elif late_peaker_pct > 70:
+            recommended = 'Hold longer (7-30 days)'
+        else:
+            recommended = 'Monitor closely, mixed patterns'
+        
+        return {
+            'early_peaker_percentage': early_peaker_pct,
+            'late_peaker_percentage': late_peaker_pct,
+            'average_days_to_ath': avg_days_to_ath,
+            'crash_rate_after_day_7': crash_rate,
+            'recommended_hold_period': recommended
+        }

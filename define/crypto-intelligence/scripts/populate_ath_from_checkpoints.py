@@ -60,7 +60,7 @@ def populate_ath_from_checkpoints():
                     outcome.days_to_ath = (max_roi_timestamp - outcome.entry_timestamp).total_seconds() / 86400
                 
                 # Recategorize outcome with new ATH
-                from services.reputation.roi_calculator import ROICalculator
+                from utils.roi_calculator import ROICalculator
                 is_winner, category = ROICalculator.categorize_outcome(outcome.ath_multiplier)
                 outcome.is_winner = is_winner
                 outcome.outcome_category = category

@@ -7,8 +7,8 @@ from typing import Optional
 from cachetools import TTLCache
 
 from config.price_config import PriceConfig
+from domain.price_data import PriceData
 from repositories.api_clients import (
-    PriceData,
     CoinGeckoClient,
     BirdeyeClient,
     MoralisClient,
@@ -35,9 +35,9 @@ class PriceEngine:
             config: Price configuration
             logger: Optional logger instance
         """
-        # Set _closed FIRST before any other initialization
+        # Initialize close lock immediately to prevent race conditions
+        self._close_lock = asyncio.Lock()
         self._closed = False
-        self._close_lock = None  # Will be initialized in async context
         
         self.config = config
         self.logger = logger or setup_logger('PriceEngine')
@@ -90,10 +90,6 @@ class PriceEngine:
     
     async def close(self):
         """Close all API client sessions (idempotent)."""
-        # Initialize async lock if needed
-        if self._close_lock is None:
-            self._close_lock = asyncio.Lock()
-        
         # Use async lock to prevent concurrent closes
         async with self._close_lock:
             if self._closed:

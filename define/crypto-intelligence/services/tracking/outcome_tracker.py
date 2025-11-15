@@ -7,25 +7,29 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, List
 
 from utils.logger import setup_logger
+from utils.roi_calculator import ROICalculator
 from domain.signal_outcome import SignalOutcome
-from services.reputation.roi_calculator import ROICalculator
 from repositories.file_storage.outcome_repository import OutcomeRepository
+# Task 6: Event-driven architecture
+from domain.events import SignalStartedEvent, SignalCompletedEvent, CheckpointUpdatedEvent
 
 
 class OutcomeTracker:
     """Tracks signal outcomes with ROI calculation at checkpoints."""
     
-    def __init__(self, data_dir: str = "data/reputation", logger=None):
+    def __init__(self, data_dir: str = "data/reputation", logger=None, event_bus=None):
         """
         Initialize outcome tracker.
         
         Args:
             data_dir: Directory for storing outcome data
             logger: Optional logger instance
+            event_bus: Optional EventBus for publishing events (Task 6)
         """
         self.logger = logger or setup_logger('OutcomeTracker')
         self.repository = OutcomeRepository(data_dir, self.logger)
         self.outcomes: Dict[str, SignalOutcome] = {}
+        self.event_bus = event_bus  # Task 6: Event bus for publishing events
         
         # Load existing outcomes
         self.outcomes = self.repository.load()
@@ -115,6 +119,27 @@ class OutcomeTracker:
         
         self.logger.info(f"Started tracking signal: {symbol or address[:10]} at ${entry_price:.6f} from {channel_name}")
         
+        # Task 6: Publish SignalStartedEvent
+        if self.event_bus:
+            event = SignalStartedEvent(
+                signal_id=str(message_id),
+                address=address,
+                chain="ethereum",  # TODO: Get from address extractor
+                symbol=symbol or address[:10],
+                entry_price=entry_price,
+                entry_timestamp=entry_ts,
+                channel_name=channel_name,
+                message_id=message_id,
+                signal_number=1,  # TODO: Get from HistoricalBootstrap deduplication
+                previous_signals=[],
+                metadata={
+                    'sentiment': sentiment,
+                    'hdrb_score': hdrb_score,
+                    'confidence': confidence
+                }
+            )
+            self._publish_event_safe(event)
+        
         return outcome
     
     def calculate_roi(self, entry_price: float, current_price: float) -> tuple[float, float]:
@@ -150,6 +175,29 @@ class OutcomeTracker:
         reached_checkpoints = ROICalculator.check_checkpoints(outcome, current_price)
         if reached_checkpoints:
             self.logger.info(f"Checkpoints reached for {outcome.symbol or address[:10]}: {', '.join(reached_checkpoints)}")
+            
+            # Process day 7 checkpoint (time-based classification)
+            if "7d" in reached_checkpoints:
+                self._process_day_7_checkpoint(outcome)
+            
+            # Process day 30 checkpoint (time-based classification)
+            if "30d" in reached_checkpoints:
+                self._process_day_30_checkpoint(outcome)
+            
+            # Task 6: Publish CheckpointUpdatedEvent for each reached checkpoint
+            if self.event_bus:
+                for checkpoint_name in reached_checkpoints:
+                    roi_pct, roi_mult = ROICalculator.calculate_roi(outcome.entry_price, current_price)
+                    event = CheckpointUpdatedEvent(
+                        signal_id=str(outcome.message_id),
+                        address=address,
+                        checkpoint_name=checkpoint_name,
+                        current_price=current_price,
+                        roi_percentage=roi_pct,
+                        roi_multiplier=roi_mult,
+                        timestamp=datetime.now(timezone.utc)
+                    )
+                    self._publish_event_safe(event)
         
         # Check stop conditions
         should_stop, reason = ROICalculator.check_stop_conditions(outcome)
@@ -207,6 +255,28 @@ class OutcomeTracker:
             f"Reason: {reason}"
         )
         
+        # Task 6: Publish SignalCompletedEvent
+        if self.event_bus:
+            event = SignalCompletedEvent(
+                signal_id=str(outcome.message_id),
+                address=address,
+                channel_name=outcome.channel_name,
+                symbol=outcome.symbol or address[:10],
+                entry_price=outcome.entry_price,
+                ath_price=outcome.ath_price,
+                ath_multiplier=outcome.ath_multiplier,
+                days_to_ath=outcome.days_to_ath,
+                is_winner=outcome.is_winner,
+                outcome_category=outcome.outcome_category,
+                signal_number=1,  # TODO: Get from signal_outcome
+                entry_timestamp=outcome.entry_timestamp,
+                completion_timestamp=datetime.now(timezone.utc),
+                market_tier=outcome.market_tier,
+                all_checkpoints={},  # TODO: Extract from outcome
+                metadata={'completion_reason': reason}
+            )
+            self._publish_event_safe(event)
+        
         return outcome
     
     def get_outcome(self, address: str) -> Optional[SignalOutcome]:
@@ -233,3 +303,122 @@ class OutcomeTracker:
             outcomes = [o for o in outcomes if o.is_complete]
         
         return outcomes
+    
+    def _process_day_7_checkpoint(self, outcome: SignalOutcome) -> None:
+        """
+        Process day 7 checkpoint for time-based classification.
+        
+        Captures performance at day 7 and classifies based on current ATH.
+        
+        Args:
+            outcome: Signal outcome to process
+        """
+        # Extract day 7 data from existing checkpoint
+        day_7_checkpoint = outcome.checkpoints.get("7d")
+        if not day_7_checkpoint or not day_7_checkpoint.reached:
+            self.logger.warning(f"Day 7 checkpoint not reached for {outcome.symbol or outcome.address[:10]}")
+            return
+        
+        # Populate day 7 fields
+        outcome.day_7_price = day_7_checkpoint.price
+        outcome.day_7_multiplier = day_7_checkpoint.roi_multiplier
+        
+        # Classify based on current ATH (not day 7 price)
+        _, category = ROICalculator.categorize_outcome(outcome.ath_multiplier)
+        outcome.day_7_classification = category
+        
+        self.logger.info(
+            f"Day 7 checkpoint: {outcome.symbol or outcome.address[:10]} - "
+            f"ATH {outcome.ath_multiplier:.2f}x, "
+            f"Current {outcome.day_7_multiplier:.2f}x, "
+            f"Classification: {category}"
+        )
+        
+        # Save outcome with day 7 data
+        self.repository.save(self.outcomes)
+    
+    def _process_day_30_checkpoint(self, outcome: SignalOutcome) -> None:
+        """
+        Process day 30 checkpoint for time-based classification.
+        
+        Captures final performance at day 30, classifies based on final ATH,
+        calculates trajectory, and determines peak timing.
+        
+        Args:
+            outcome: Signal outcome to process
+        """
+        # Extract day 30 data from existing checkpoint
+        day_30_checkpoint = outcome.checkpoints.get("30d")
+        if not day_30_checkpoint or not day_30_checkpoint.reached:
+            self.logger.warning(f"Day 30 checkpoint not reached for {outcome.symbol or outcome.address[:10]}")
+            return
+        
+        # Populate day 30 fields
+        outcome.day_30_price = day_30_checkpoint.price
+        outcome.day_30_multiplier = day_30_checkpoint.roi_multiplier
+        
+        # Classify based on final ATH
+        _, category = ROICalculator.categorize_outcome(outcome.ath_multiplier)
+        outcome.day_30_classification = category
+        
+        # Calculate trajectory (improved or crashed from day 7 to day 30, considering ATH)
+        if outcome.day_7_multiplier > 0:
+            trajectory, crash_severity = ROICalculator.analyze_trajectory(
+                outcome.day_7_multiplier,
+                outcome.day_30_multiplier,
+                outcome.ath_multiplier  # Pass ATH to detect crashes from peak
+            )
+            outcome.trajectory = trajectory
+            
+            # Log severe crashes
+            if trajectory == "crashed" and crash_severity > 50:
+                self.logger.warning(
+                    f"Severe crash: {outcome.symbol or outcome.address[:10]} "
+                    f"dropped {crash_severity:.1f}% from day 7 to day 30"
+                )
+        else:
+            outcome.trajectory = "unknown"
+        
+        # Determine peak timing (early or late peaker)
+        if outcome.days_to_ath >= 0:
+            outcome.peak_timing = ROICalculator.determine_peak_timing(outcome.days_to_ath)
+        else:
+            outcome.peak_timing = "unknown"
+        
+        self.logger.info(
+            f"Day 30 final: {outcome.symbol or outcome.address[:10]} - "
+            f"ATH {outcome.ath_multiplier:.2f}x (day {outcome.days_to_ath:.0f}), "
+            f"Final {outcome.day_30_multiplier:.2f}x, "
+            f"Trajectory: {outcome.trajectory}"
+        )
+        
+        # Mark as complete (30 days elapsed)
+        outcome.is_complete = True
+        outcome.status = "completed"
+        outcome.completion_reason = "30d_elapsed"
+        
+        # Save outcome with day 30 data
+        self.repository.save(self.outcomes)
+    
+    def _publish_event_safe(self, event):
+        """
+        Publish event safely from any context (sync or async).
+        
+        Args:
+            event: Event to publish
+        """
+        if not self.event_bus:
+            return
+        
+        try:
+            import asyncio
+            # Try to get running loop
+            loop = asyncio.get_running_loop()
+            # We're in async context - schedule task
+            asyncio.create_task(self.event_bus.publish(event))
+        except RuntimeError:
+            # No event loop running - log warning
+            self.logger.warning(
+                f"Cannot publish {type(event).__name__} - no event loop running. "
+                f"Event will be skipped."
+            )

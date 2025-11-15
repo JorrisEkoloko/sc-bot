@@ -9,31 +9,13 @@ Based on verified documentation:
 - datetime: https://docs.python.org/3/library/datetime.html
 - dataclasses: https://docs.python.org/3/library/dataclasses.html
 """
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
 from utils.logger import setup_logger
 from repositories.writers.csv_writer import CSVTableWriter
 from repositories.file_storage.tracking_repository import TrackingRepository
-
-
-@dataclass
-class PerformanceData:
-    """7-day ATH performance metrics."""
-    address: str
-    chain: str
-    first_message_id: str
-    start_price: float
-    start_time: str  # ISO format string
-    ath_since_mention: float
-    ath_time: str  # ISO format string
-    ath_multiplier: float
-    current_multiplier: float
-    days_tracked: int
-    current_price: float = 0.0
-    time_to_ath: Optional[str] = None  # ISO duration or None
-    is_at_ath: bool = False
+from domain.performance_data import PerformanceData
 
 
 class PerformanceTracker:
@@ -44,10 +26,13 @@ class PerformanceTracker:
     Writes to PERFORMANCE CSV table on every update.
     """
     
-    # PERFORMANCE table columns (10 columns)
+    # PERFORMANCE table columns (19 columns with time-based fields)
     PERFORMANCE_COLUMNS = [
         'address', 'chain', 'first_message_id', 'start_price', 'start_time',
-        'ath_since_mention', 'ath_time', 'ath_multiplier', 'current_multiplier', 'days_tracked'
+        'ath_since_mention', 'ath_time', 'ath_multiplier', 'current_multiplier', 'days_tracked',
+        # Time-based performance columns (Task 4: Dual-metric classification)
+        'days_to_ath', 'peak_timing', 'day_7_price', 'day_7_multiplier', 'day_7_classification',
+        'day_30_price', 'day_30_multiplier', 'day_30_classification', 'trajectory'
     ]
     
     def __init__(self, data_dir: str = "data/performance", tracking_days: int = 7, 
@@ -205,6 +190,9 @@ class PerformanceTracker:
             delta = ath_time - start_time
             time_to_ath = str(delta)  # String representation of timedelta
         
+        # Calculate days_to_ath from ath_time
+        days_to_ath_value = (ath_time - start_time).total_seconds() / 86400
+        
         return PerformanceData(
             address=address,
             chain=entry['chain'],
@@ -218,32 +206,48 @@ class PerformanceTracker:
             days_tracked=days_tracked,
             current_price=entry['current_price'],
             time_to_ath=time_to_ath,
-            is_at_ath=is_at_ath
+            is_at_ath=is_at_ath,
+            # Time-based performance fields (Task 4: Dual-metric classification)
+            # These come from SignalOutcome via outcome_tracker, stored in tracking_data
+            days_to_ath=days_to_ath_value,
+            peak_timing=entry.get('peak_timing', ''),
+            day_7_price=entry.get('day_7_price', 0.0),
+            day_7_multiplier=entry.get('day_7_multiplier', 0.0),
+            day_7_classification=entry.get('day_7_classification', ''),
+            day_30_price=entry.get('day_30_price', 0.0),
+            day_30_multiplier=entry.get('day_30_multiplier', 0.0),
+            day_30_classification=entry.get('day_30_classification', ''),
+            trajectory=entry.get('trajectory', '')
         )
     
     def cleanup_old_entries(self):
-        """Remove entries older than configured tracking days."""
+        """Remove entries older than configured tracking days (atomic operation)."""
         now = datetime.now()
-        to_remove = []
+        
+        # Build new dict with only valid, recent entries (atomic operation)
+        new_tracking_data = {}
+        removed_count = 0
         
         for address, entry in self.tracking_data.items():
             try:
                 start_time = datetime.fromisoformat(entry['start_time'])
                 age_days = (now - start_time).days
                 
-                if age_days > self.tracking_days:
-                    to_remove.append(address)
+                if age_days <= self.tracking_days:
+                    new_tracking_data[address] = entry
+                else:
+                    removed_count += 1
+                    self.logger.info(f"Removed old tracking entry: {address[:10]}... (>{self.tracking_days} days)")
             except (ValueError, KeyError) as e:
-                self.logger.warning(f"Invalid entry for {address[:10]}...: {e}")
-                to_remove.append(address)
+                self.logger.warning(f"Invalid entry for {address[:10]}...: {e}, removing")
+                removed_count += 1
         
-        for address in to_remove:
-            del self.tracking_data[address]
-            self.logger.info(f"Removed old tracking entry: {address[:10]}... (>{self.tracking_days} days)")
+        # Atomic replacement
+        self.tracking_data = new_tracking_data
         
-        if to_remove:
+        if removed_count > 0:
             self.save_to_disk()
-            self.logger.info(f"Cleanup complete: removed {len(to_remove)} entries")
+            self.logger.info(f"Cleanup complete: removed {removed_count} entries")
     
     async def save_to_disk_async(self):
         """Persist tracking data using repository (async, thread-safe)."""

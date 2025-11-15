@@ -89,6 +89,16 @@ class SignalOutcome:
     current_price: float = 0.0
     current_multiplier: float = 0.0
     
+    # Time-based performance (Day 7 + Day 30 checkpoints)
+    day_7_price: float = 0.0  # Price at day 7 checkpoint
+    day_7_multiplier: float = 0.0  # ROI multiplier at day 7
+    day_7_classification: str = ""  # Classification at day 7 (MOON/WINNER/GOOD/BREAK-EVEN/LOSER)
+    day_30_price: float = 0.0  # Price at day 30 checkpoint
+    day_30_multiplier: float = 0.0  # ROI multiplier at day 30
+    day_30_classification: str = ""  # Final classification at day 30
+    trajectory: str = ""  # Performance trend ("improved" or "crashed")
+    peak_timing: str = ""  # When ATH occurred ("early_peaker" or "late_peaker")
+    
     # Market context
     market_tier: str = ""  # micro, small, mid, large
     risk_level: str = ""
@@ -132,6 +142,14 @@ class SignalOutcome:
             'days_to_ath': self.days_to_ath,
             'current_price': self.current_price,
             'current_multiplier': self.current_multiplier,
+            'day_7_price': self.day_7_price,
+            'day_7_multiplier': self.day_7_multiplier,
+            'day_7_classification': self.day_7_classification,
+            'day_30_price': self.day_30_price,
+            'day_30_multiplier': self.day_30_multiplier,
+            'day_30_classification': self.day_30_classification,
+            'trajectory': self.trajectory,
+            'peak_timing': self.peak_timing,
             'market_tier': self.market_tier,
             'risk_level': self.risk_level,
             'risk_score': self.risk_score,
@@ -172,6 +190,14 @@ class SignalOutcome:
             days_to_ath=data.get('days_to_ath', 0.0),
             current_price=data.get('current_price', 0.0),
             current_multiplier=data.get('current_multiplier', 0.0),
+            day_7_price=data.get('day_7_price', 0.0),
+            day_7_multiplier=data.get('day_7_multiplier', 0.0),
+            day_7_classification=data.get('day_7_classification', ''),
+            day_30_price=data.get('day_30_price', 0.0),
+            day_30_multiplier=data.get('day_30_multiplier', 0.0),
+            day_30_classification=data.get('day_30_classification', ''),
+            trajectory=data.get('trajectory', ''),
+            peak_timing=data.get('peak_timing', ''),
             market_tier=data.get('market_tier', ''),
             risk_level=data.get('risk_level', ''),
             risk_score=data.get('risk_score', 0.0),

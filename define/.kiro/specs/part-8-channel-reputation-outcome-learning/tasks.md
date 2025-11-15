@@ -967,139 +967,319 @@ Coin-Specific TD Learning:
 
 ---
 
-## - [ ] 6. Integrate multi-dimensional ROI-based reputation into live monitoring pipeline
+## - [ ] 6. Integrate multi-dimensional ROI-based reputation into live monitoring pipeline with event-driven architecture
 
-Integrate enhanced reputation system with existing components to use multi-dimensional ROI predictions in real-time, with fresh start re-monitoring and comprehensive output.
+Integrate enhanced reputation system with existing components using event-driven architecture (observer pattern) for real-time multi-dimensional ROI predictions, with fresh start re-monitoring and comprehensive output.
 
 **ROI Focus**: Use multi-dimensional "Expected ROI" (overall + coin-specific + cross-channel) to adjust confidence for new signals and continue learning from live outcomes.
 
+**MCP-Validated Enhancements**:
+
+- ✅ Event-driven architecture (Wikipedia) - Decoupled components with event notifications
+- ✅ Observer pattern (Wikipedia) - Subject-observer relationship for signal completion events
+- ✅ Callback pattern (Wikipedia) - Asynchronous notification when signals complete
+- ✅ Sharpe ratio (Investopedia) - Risk-adjusted returns for reputation scoring
+- ✅ Reinforcement learning (Wikipedia) - Continuous learning from outcomes
+
 **Implementation Details**:
 
-**1. Signal Completion & TD Learning Integration:**
+**1. Event-Driven Signal Completion Architecture (NEW!):**
 
-- Modify `ReputationEngine.update_reputation()` to call TD learning after calculating metrics
-- When signal completes:
+- Create `domain/events.py` with event classes:
+  - `SignalCompletedEvent` - Emitted when signal reaches 30d or stop condition
+  - `CheckpointReachedEvent` - Emitted when checkpoint (1h, 4h, 24h, etc.) reached
+  - `ReputationUpdatedEvent` - Emitted when reputation changes significantly (>5 points)
+- Create `infrastructure/event_bus.py` with EventBus class:
+  - `subscribe(event_type, callback)` - Register observers for events
+  - `publish(event)` - Notify all observers of event
+  - `unsubscribe(event_type, callback)` - Remove observer
+- Implement observer pattern for decoupled components:
+  - OutcomeTracker publishes SignalCompletedEvent
+  - ReputationEngine subscribes to SignalCompletedEvent
+  - DataOutput subscribes to ReputationUpdatedEvent
+  - MessageProcessor subscribes to CheckpointReachedEvent
+
+**2. Enhanced TD Learning Integration with Event Callbacks:**
+
+- Modify `ReputationEngine.update_reputation()` to be event-driven callback
+- When SignalCompletedEvent received:
+  - Extract signal outcome from event payload
   - Call `apply_td_learning()` for overall channel learning
   - Call `apply_coin_specific_td_learning()` for coin-specific learning
   - Call `update_cross_channel_coin_performance()` for cross-channel tracking
+  - Publish ReputationUpdatedEvent if score changes >5 points
 - Check if signal is in active_tracking.json
-  - YES → Archive to completed_history.json
-  - Update both files atomically
+  - YES → Archive to completed_history.json atomically (Task 5 pattern)
+  - Update both files using atomic write pattern
 - Enable fresh start re-monitoring (coin available for tracking again)
 
-**2. MessageProcessor Integration:**
+**3. Enhanced MessageProcessor Integration with Prediction Caching:**
 
-- Modify `MessageProcessor.process_message()` to lookup reputation
-- Get multi-dimensional prediction:
-  - Overall channel expected_roi (40% weight)
-  - Coin-specific expected_roi (50% weight) if coin previously tracked
-  - Cross-channel expected_roi (10% weight) if coin tracked by other channels
-- Calculate weighted prediction
-- Adjust confidence based on reputation score:
-  - Elite (90-100): +25% confidence boost
-  - Excellent (75-90): +20% confidence boost
-  - Good (60-75): +10% confidence boost
-  - Average (40-60): No adjustment
-  - Poor (20-40): -10% confidence reduction
-  - Unreliable (0-20): -20% confidence reduction
-- Log prediction breakdown for transparency
+- Modify `MessageProcessor.process_message()` to lookup reputation with caching
+- Implement prediction cache (TTL: 5 minutes) to reduce reputation lookups
+- Get multi-dimensional prediction with fallback logic:
+  - Overall channel expected_roi (40% weight) - Always available
+  - Coin-specific expected_roi (50% weight) - If coin previously tracked by this channel
+  - Cross-channel expected_roi (10% weight) - If coin tracked by any channel
+  - Fallback: Use overall only if coin-specific unavailable
+- Calculate weighted prediction with confidence intervals:
+  - Prediction = weighted average of available sources
+  - Confidence interval = ±(std_dev × 1.96) for 95% confidence
+  - Prediction accuracy = % of past predictions within confidence interval
+- Adjust confidence based on reputation tier (MCP-validated Sharpe ratio approach):
+  - Elite (90-100): +25% confidence boost, Sharpe >1.5
+  - Excellent (75-90): +20% confidence boost, Sharpe 1.0-1.5
+  - Good (60-75): +10% confidence boost, Sharpe 0.5-1.0
+  - Average (40-60): No adjustment, Sharpe 0.0-0.5
+  - Poor (20-40): -10% confidence reduction, Sharpe <0.0
+  - Unreliable (0-20): -20% confidence reduction, Sharpe <<0.0
+- Log prediction breakdown with transparency:
+  - "Prediction: Overall 1.85x (40%), AVICI 3.112x (50%), Cross-channel 2.376x (10%) = 2.464x ±0.35 (95% CI)"
+  - "Confidence adjusted: 0.65 → 0.78 (Excellent tier, Sharpe=1.2)"
 
-**3. Fresh Start Re-Monitoring:**
+**4. Fresh Start Re-Monitoring with Deduplication (Task 5 Integration):**
 
 - When new message arrives with coin mention:
+  - Use HistoricalBootstrap.check_for_duplicate() method (Task 5)
   - Check active_tracking.json first
     - Found → Skip (duplicate, already tracking)
+    - Log: "Duplicate: {coin} already tracked, skipping"
   - Check completed_history.json
     - Found → Start fresh tracking (Signal #2, #3, etc.)
+    - Log: "{coin} previously tracked (Signal #{prev_num}: {prev_roi}x), starting Signal #{new_num}"
     - Not found → Start first tracking (Signal #1)
+    - Log: "First mention: {coin} Signal #1 with entry price ${price}"
 - Create new SignalOutcome with:
-  - New entry_price (current market price)
-  - New signal_id (unique per mention)
-  - signal_number (1, 2, 3, etc.)
-  - previous_signals reference (for context)
-- Track independently from previous signals
+  - New entry_price (current market price from API)
+  - New signal_id (UUID for unique identification)
+  - signal_number (1, 2, 3, etc.) - From check_for_duplicate()
+  - previous_signals reference (list of previous signal IDs for learning context)
+  - status = "in_progress" (will track for 30 days)
+- Track independently from previous signals (fresh entry price, fresh tracking window)
+- Publish SignalStartedEvent for observers (e.g., logging, monitoring)
 
-**4. DataOutput Enhancement:**
+**5. Enhanced DataOutput with Event-Driven Updates:**
 
+- Subscribe to ReputationUpdatedEvent for real-time output updates
 - Add reputation columns to MESSAGES table:
-  - channel_reputation_score
-  - channel_reputation_tier
-  - channel_expected_roi (overall)
-  - channel_coin_expected_roi (coin-specific, if available)
-  - channel_win_rate
+  - channel_reputation_score (0-100)
+  - channel_reputation_tier (Elite/Excellent/Good/Average/Poor/Unreliable)
+  - channel_expected_roi (overall prediction)
+  - channel_coin_expected_roi (coin-specific prediction, if available)
+  - channel_win_rate (% of signals ≥2x)
+  - channel_sharpe_ratio (risk-adjusted returns, MCP-validated)
   - prediction_source (overall/coin-specific/multi-dimensional)
+  - prediction_confidence_interval (±X.XX for 95% CI)
 - Create CHANNEL_RANKINGS table (replaces CHANNEL_REPUTATION):
   - channel_name, total_signals, win_rate
   - avg_roi, median_roi, best_roi, worst_roi
-  - expected_roi (overall), sharpe_ratio, speed_score
+  - expected_roi (overall TD learning prediction), sharpe_ratio, speed_score
   - reputation_score, reputation_tier
-  - total_predictions, prediction_accuracy, mean_absolute_error
+  - total_predictions, prediction_accuracy (% within CI), mean_absolute_error
+  - mean_squared_error, confidence_interval_width
   - first_signal_date, last_signal_date, last_updated
   - Sort by reputation_score descending (best channels first)
+  - Add rank column (1, 2, 3, ...) for easy comparison
 - Create CHANNEL_COIN_PERFORMANCE table (NEW!):
   - channel_name, coin_symbol, mentions
-  - avg_roi, expected_roi, win_rate
+  - avg_roi, expected_roi (coin-specific TD learning), win_rate
   - best_roi, worst_roi, prediction_accuracy
-  - last_mentioned, recommendation
+  - sharpe_ratio (coin-specific risk-adjusted returns)
+  - last_mentioned, days_since_last_mention
+  - recommendation (Strong Buy/Buy/Hold/Avoid based on expected_roi)
   - Sort by avg_roi descending within each channel
 - Create COIN_CROSS_CHANNEL table (NEW!):
   - coin_symbol, total_mentions, total_channels
-  - avg_roi_all_channels, best_channel, best_channel_roi
-  - worst_channel, worst_channel_roi
-  - consensus_strength, recommendation
+  - avg_roi_all_channels, median_roi_all_channels
+  - best_channel, best_channel_roi, best_channel_mentions
+  - worst_channel, worst_channel_roi, worst_channel_mentions
+  - consensus_strength (0-100, based on channel agreement)
+  - recommendation (Strong consensus/Weak consensus/Conflicting signals)
   - Sort by avg_roi_all_channels descending
-- Add conditional formatting in Google Sheets:
-  - Green: reputation_score > 75, expected_roi > 2.0
-  - Yellow: reputation_score 40-75, expected_roi 1.5-2.0
-  - Red: reputation_score < 40, expected_roi < 1.5
+- Create PREDICTION_ACCURACY table (NEW!):
+  - channel_name, total_predictions, correct_predictions (within CI)
+  - accuracy_percentage, mean_absolute_error, mean_squared_error
+  - overestimations, underestimations, avg_error_magnitude
+  - Sort by accuracy_percentage descending
+- Add conditional formatting in Google Sheets (MCP-validated color psychology):
+  - Green: reputation_score > 75, expected_roi > 2.0, sharpe_ratio > 1.0
+  - Yellow: reputation_score 40-75, expected_roi 1.5-2.0, sharpe_ratio 0.5-1.0
+  - Red: reputation_score < 40, expected_roi < 1.5, sharpe_ratio < 0.5
+  - Bold: Elite tier channels
+  - Italic: Unproven channels (<10 signals)
 
-**5. Live Monitoring Continuation:**
+**6. Event-Driven Live Monitoring Continuation:**
 
-- Load active_tracking.json on startup
-- Continue monitoring in-progress signals
-- Check checkpoints as time passes
-- When checkpoint reached:
-  - Fetch current price
-  - Calculate ROI
-  - Update checkpoint data
-  - Save to active_tracking.json
-- When 30d reached:
-  - Complete signal
-  - Apply TD learning (all 3 levels)
-  - Archive to completed_history.json
-  - Remove from active_tracking.json
+- Load active_tracking.json on startup using HistoricalBootstrap (Task 5)
+- Subscribe to CheckpointReachedEvent for checkpoint monitoring
+- Continue monitoring in-progress signals with event-driven architecture
+- When checkpoint time arrives (1h, 4h, 24h, 3d, 7d, 30d):
+  - Publish CheckpointReachedEvent with signal_id and checkpoint_name
+  - OutcomeTracker receives event and fetches current price
+  - Calculate ROI: (current_price - entry_price) / entry_price
+  - Update checkpoint data in SignalOutcome
+  - Save to active_tracking.json atomically (Task 5 pattern)
+  - Publish CheckpointUpdatedEvent for observers
+- When 30d checkpoint reached OR stop condition met:
+  - Mark signal as complete
+  - Publish SignalCompletedEvent with full outcome data
+  - ReputationEngine receives event and applies TD learning (all 3 levels):
+    - Overall channel: new_expected = old_expected + 0.1 × (actual - old_expected)
+    - Coin-specific: new_coin_expected = old_coin_expected + 0.1 × (actual - old_coin_expected)
+    - Cross-channel: Update aggregated coin performance across all channels
+  - Archive to completed_history.json atomically (Task 5 pattern)
+  - Remove from active_tracking.json atomically
+  - Publish ReputationUpdatedEvent if score changes >5 points
+- Implement graceful shutdown:
+  - Save all in-progress signals to active_tracking.json
+  - Persist event subscriptions for restart
+  - Log shutdown summary: X signals in progress, Y signals completed today
 
 **External Verification with fetch MCP**:
 
-- Verify event-driven architecture patterns
-- Verify callback registration patterns
-- Verify data output best practices
-- Verify multi-dimensional prediction patterns
+- ✅ Event-driven architecture (Wikipedia) - Verified pattern for decoupled components
+- ✅ Observer pattern (Wikipedia) - Verified subject-observer relationship
+- ✅ Callback pattern (Wikipedia) - Verified asynchronous notification pattern
+- ✅ Sharpe ratio (Investopedia) - Verified risk-adjusted returns formula
+- ✅ Reinforcement learning (Wikipedia) - Verified continuous learning approach
+- ✅ ROI calculation (Investopedia) - Previously verified in Task 1
+- ✅ TD learning (Wikipedia) - Previously verified in Task 3
+
+**Files to Create**:
+
+- `domain/events.py` (~150 lines) - Event classes for event-driven architecture
+- `infrastructure/event_bus.py` (~200 lines) - EventBus for publish-subscribe pattern
+- `utils/prediction_cache.py` (~100 lines) - Prediction caching with TTL
 
 **Files to Modify**:
 
-- `services/reputation/reputation_engine.py` (add TD learning calls in update_reputation)
-- `services/message_processing/message_processor.py` (add reputation lookup and multi-dimensional prediction)
-- `infrastructure/output/data_output.py` (add 3 new tables + reputation columns)
-- `services/tracking/outcome_tracker.py` (add archival logic)
+- `services/reputation/reputation_engine.py` (add event-driven TD learning callbacks)
+- `services/message_processing/message_processor.py` (add reputation lookup with caching and multi-dimensional prediction)
+- `infrastructure/output/data_output.py` (add 4 new tables + enhanced reputation columns, subscribe to ReputationUpdatedEvent)
+- `services/tracking/outcome_tracker.py` (add event publishing, archival logic with Task 5 integration)
+- `services/reputation/historical_bootstrap.py` (integrate with event bus for startup)
 
 **Pipeline Verification Steps**:
 
 **After Bootstrap:**
 
 1. Run system after historical bootstrap complete
-2. Verify active_tracking.json loaded (35 in-progress signals)
-3. Verify completed_history.json loaded (452 finished signals)
-4. Verify logs show: "Loaded X active signals, Y completed signals"
-5. Verify logs show: "Loaded reputation for [channel]: score=78.5, expected_roi=1.85x"
+2. Verify EventBus initialized with all subscriptions
+3. Verify active_tracking.json loaded (35 in-progress signals) via HistoricalBootstrap
+4. Verify completed_history.json loaded (452 finished signals) via HistoricalBootstrap
+5. Verify logs show: "EventBus: Registered X observers for Y event types"
+6. Verify logs show: "Loaded X active signals, Y completed signals"
+7. Verify logs show: "Loaded reputation for [channel]: score=78.5, expected_roi=1.85x, sharpe=0.89"
+8. Verify prediction cache initialized (TTL: 5 minutes)
 
-**New Message Processing:** 6. New message arrives: "$AVICI breakout!" 7. Check active_tracking.json: AVICI not found (completed previously) 8. Check completed_history.json: AVICI found (Signal #1: 3.252x) 9. Start fresh tracking: Signal #2 with new entry price 10. Get multi-dimensional prediction: - Overall: 1.85x (40%) = 0.740 - Coin-specific (AVICI): 3.112x (50%) = 1.556 - Cross-channel (AVICI): 2.376x (10%) = 0.238 - Weighted: 2.534x 11. Adjust confidence: 0.65 → 0.78 (excellent tier +20%) 12. Verify logs show: "Multi-dimensional prediction: Overall 1.85x, AVICI 3.112x, Cross-channel 2.376x = 2.534x" 13. Verify logs show: "Confidence adjusted: 0.65 → 0.78 (reputation boost)" 14. Verify logs show: "Starting Signal #2 for AVICI (previous: 3.252x)"
+**New Message Processing (Event-Driven):**
 
-**Signal Completion:** 15. Wait for signal to complete (30d reached or ATH) 16. Actual ROI: 2.15x 17. Apply TD learning (all 3 levels): - Overall: 1.85 + (0.1 × 0.30) = 1.88x - Coin-specific (AVICI): 3.112 + (0.1 × -0.962) = 3.016x - Cross-channel (AVICI): Update with new data point 18. Archive to completed_history.json 19. Remove from active_tracking.json 20. Verify logs show: "Signal complete: actual ROI=2.15x" 21. Verify logs show: "TD Learning (Overall): 1.85x → 1.88x (error: +0.30x)" 22. Verify logs show: "TD Learning (Coin-Specific): AVICI 3.112x → 3.016x (error: -0.962x)" 23. Verify logs show: "Cross-Channel Update: AVICI avg 2.363x across 2 channels" 24. Verify logs show: "Archived to history: AVICI Signal #2"
+9. New message arrives: "$AVICI breakout!"
+10. MessageProcessor publishes MessageReceivedEvent
+11. Check active_tracking.json: AVICI not found (completed previously)
+12. Check completed_history.json: AVICI found (Signal #1: 3.252x)
+13. Start fresh tracking: Signal #2 with new entry price
+14. Publish SignalStartedEvent with signal details
+15. Get multi-dimensional prediction with caching:
+    - Cache miss → Calculate prediction
+    - Overall: 1.85x (40%) = 0.740
+    - Coin-specific (AVICI): 3.112x (50%) = 1.556
+    - Cross-channel (AVICI): 2.376x (10%) = 0.238
+    - Weighted: 2.534x ±0.35 (95% CI)
+    - Cache result for 5 minutes
+16. Adjust confidence: 0.65 → 0.78 (excellent tier +20%, Sharpe=1.2)
+17. Verify logs show: "Multi-dimensional prediction: Overall 1.85x (40%), AVICI 3.112x (50%), Cross-channel 2.376x (10%) = 2.534x ±0.35 (95% CI)"
+18. Verify logs show: "Confidence adjusted: 0.65 → 0.78 (Excellent tier, Sharpe=1.2)"
+19. Verify logs show: "Starting Signal #2 for AVICI (previous: Signal #1: 3.252x)"
+20. Verify logs show: "Event published: SignalStartedEvent for AVICI Signal #2"
 
-**Output Verification:** 25. Verify MESSAGES table includes: - channel_reputation_score=78.5 - channel_expected_roi=1.88 - channel_coin_expected_roi=3.016 (AVICI) - prediction_source="multi-dimensional" 26. Verify CHANNEL_RANKINGS table: - Sorted by reputation_score descending - Shows: win_rate=60%, avg_roi=1.85x, expected_roi=1.88x - Shows: prediction_accuracy=63.9%, mean_absolute_error=0.423x 27. Verify CHANNEL_COIN_PERFORMANCE table: - Eric → AVICI: 2 mentions, avg 2.701x, expected 3.016x - Eric → NKP: 1 mention, avg 0.932x, expected 0.932x - Sorted by avg_roi descending within channel 28. Verify COIN_CROSS_CHANNEL table: - AVICI: 2 channels, avg 2.363x, best: Eric (2.701x) - Sorted by avg_roi_all_channels descending 29. Verify Google Sheets conditional formatting: - Green: Eric (78.5 score, 1.88x expected) - Yellow/Red: Other channels based on scores 30. Verify all tables update after each signal completion
+**Checkpoint Monitoring (Event-Driven):**
 
-**Next Signal:** 31. New message from Eric: "$AVICI dip buy!" 32. Check active_tracking.json: AVICI not found 33. Check completed_history.json: AVICI found (2 previous signals) 34. Start fresh tracking: Signal #3 with new entry price 35. Get prediction: 3.016x (learned from Signal #2) 36. Verify logs show: "Starting Signal #3 for AVICI (previous: 3.252x, 2.15x)" 37. Verify fresh start re-monitoring works correctly
+21. 1h checkpoint arrives
+22. Publish CheckpointReachedEvent(signal_id, "1h")
+23. OutcomeTracker receives event, fetches price, calculates ROI
+24. Publish CheckpointUpdatedEvent with ROI data
+25. Verify logs show: "Checkpoint 1h reached: AVICI ROI=1.034x"
+26. Verify logs show: "Event published: CheckpointUpdatedEvent for AVICI 1h"
+27. Repeat for 4h, 24h, 3d, 7d checkpoints
+
+**Signal Completion (Event-Driven):**
+
+28. 30d checkpoint reached OR stop condition met
+29. Actual ROI: 2.15x
+30. Publish SignalCompletedEvent with full outcome data
+31. ReputationEngine receives event via callback
+32. Apply TD learning (all 3 levels):
+    - Overall: 1.85 + (0.1 × 0.30) = 1.88x
+    - Coin-specific (AVICI): 3.112 + (0.1 × -0.962) = 3.016x
+    - Cross-channel (AVICI): Update with new data point
+33. Reputation score changes: 78.5 → 79.2 (+0.7, <5 threshold, no event)
+34. Archive to completed_history.json atomically (Task 5 pattern)
+35. Remove from active_tracking.json atomically
+36. Verify logs show: "Event received: SignalCompletedEvent for AVICI Signal #2"
+37. Verify logs show: "Signal complete: actual ROI=2.15x"
+38. Verify logs show: "TD Learning (Overall): 1.85x → 1.88x (error: +0.30x)"
+39. Verify logs show: "TD Learning (Coin-Specific): AVICI 3.112x → 3.016x (error: -0.962x)"
+40. Verify logs show: "Cross-Channel Update: AVICI avg 2.363x across 2 channels"
+41. Verify logs show: "Archived to history: AVICI Signal #2 (atomic write)"
+42. Verify logs show: "Reputation updated: 78.5 → 79.2 (no event, <5 threshold)"
+
+**Output Verification (Event-Driven):**
+
+43. DataOutput subscribed to ReputationUpdatedEvent (no event this time)
+44. Verify MESSAGES table includes:
+    - channel_reputation_score=79.2
+    - channel_expected_roi=1.88
+    - channel_coin_expected_roi=3.016 (AVICI)
+    - channel_sharpe_ratio=0.89
+    - prediction_source="multi-dimensional"
+    - prediction_confidence_interval="±0.35"
+45. Verify CHANNEL_RANKINGS table:
+    - Sorted by reputation_score descending
+    - Rank column: 1, 2, 3, ...
+    - Shows: win_rate=60%, avg_roi=1.85x, expected_roi=1.88x, sharpe_ratio=0.89
+    - Shows: prediction_accuracy=63.9%, mean_absolute_error=0.423x, MSE=0.289
+46. Verify CHANNEL_COIN_PERFORMANCE table:
+    - Eric → AVICI: 2 mentions, avg 2.701x, expected 3.016x, sharpe=1.15
+    - Eric → NKP: 1 mention, avg 0.932x, expected 0.932x, sharpe=-0.25
+    - Sorted by avg_roi descending within channel
+    - Recommendation: "Strong Buy" for AVICI, "Avoid" for NKP
+47. Verify COIN_CROSS_CHANNEL table:
+    - AVICI: 2 channels, avg 2.363x, median 2.300x
+    - Best: Eric (2.701x, 2 mentions), Worst: Other (2.025x, 1 mention)
+    - Consensus strength: 85/100 (strong agreement)
+    - Sorted by avg_roi_all_channels descending
+48. Verify PREDICTION_ACCURACY table:
+    - Eric: 487 predictions, 311 correct (63.9%), MAE=0.423x, MSE=0.289
+    - Sorted by accuracy_percentage descending
+49. Verify Google Sheets conditional formatting:
+    - Green: Eric (79.2 score, 1.88x expected, sharpe=0.89)
+    - Bold: Elite tier channels
+    - Yellow/Red: Other channels based on scores
+50. Verify all tables update after each signal completion
+
+**Next Signal (Fresh Start Re-Monitoring):**
+
+51. New message from Eric: "$AVICI dip buy!"
+52. Check active_tracking.json: AVICI not found
+53. Check completed_history.json: AVICI found (2 previous signals)
+54. Start fresh tracking: Signal #3 with new entry price $1.80
+55. Get prediction from cache (if within 5 min) or calculate: 3.016x
+56. Publish SignalStartedEvent
+57. Verify logs show: "Starting Signal #3 for AVICI (previous: Signal #1: 3.252x, Signal #2: 2.15x)"
+58. Verify logs show: "Event published: SignalStartedEvent for AVICI Signal #3"
+59. Verify fresh start re-monitoring works correctly with independent tracking
+
+**Event Bus Verification:**
+
+60. Verify EventBus has active subscriptions:
+    - SignalCompletedEvent → ReputationEngine.on_signal_completed
+    - CheckpointReachedEvent → OutcomeTracker.on_checkpoint_reached
+    - ReputationUpdatedEvent → DataOutput.on_reputation_updated
+    - SignalStartedEvent → Logger.on_signal_started
+61. Verify event publishing works asynchronously (non-blocking)
+62. Verify observers receive events in correct order
+63. Verify graceful shutdown saves all subscriptions
 
 **Historical Scraper Verification**:
 
@@ -1127,13 +1307,68 @@ Run `python scripts/historical_scraper.py` and verify:
 **Success Criteria**:
 
 - ✅ Historical bootstrap establishes baseline reputation (overall + coin-specific)
+- ✅ Event-driven architecture decouples components (observer pattern)
 - ✅ Live monitoring uses multi-dimensional prediction (3 sources weighted)
+- ✅ Prediction caching reduces reputation lookups (5-minute TTL)
+- ✅ Confidence intervals provide prediction uncertainty (±X.XX for 95% CI)
 - ✅ TD learning updates at all 3 levels after each signal
 - ✅ Fresh start re-monitoring works (coins can be tracked multiple times)
-- ✅ Deduplication prevents duplicate tracking
-- ✅ Archival system works (active → history)
-- ✅ Output shows comprehensive metrics (3 new tables)
+- ✅ Deduplication prevents duplicate tracking (Task 5 integration)
+- ✅ Archival system works atomically (active → history, Task 5 pattern)
+- ✅ Output shows comprehensive metrics (4 new tables including PREDICTION_ACCURACY)
+- ✅ Sharpe ratio provides risk-adjusted returns (MCP-validated)
+- ✅ Event bus enables asynchronous notifications (non-blocking)
 - ✅ System answers: "What ROI can I expect from this channel calling this coin?"
+
+**Key Enhancements Over Original Task 6**:
+
+**Event-Driven Architecture (NEW!):**
+
+- ✅ EventBus with publish-subscribe pattern (Wikipedia-validated)
+- ✅ Observer pattern for decoupled components
+- ✅ Asynchronous event notifications (non-blocking)
+- ✅ Event types: SignalCompletedEvent, CheckpointReachedEvent, ReputationUpdatedEvent, SignalStartedEvent
+- ✅ Graceful shutdown with subscription persistence
+
+**Enhanced Prediction System (NEW!):**
+
+- ✅ Prediction caching with 5-minute TTL (reduces lookups)
+- ✅ Confidence intervals (±X.XX for 95% CI) for prediction uncertainty
+- ✅ Prediction accuracy tracking (% within confidence interval)
+- ✅ Fallback logic when coin-specific data unavailable
+- ✅ Transparent logging of prediction breakdown
+
+**Risk-Adjusted Metrics (NEW!):**
+
+- ✅ Sharpe ratio for risk-adjusted returns (Investopedia-validated)
+- ✅ Sharpe-based confidence adjustments (Elite: >1.5, Excellent: 1.0-1.5, etc.)
+- ✅ Coin-specific Sharpe ratios in CHANNEL_COIN_PERFORMANCE table
+- ✅ Mean squared error (MSE) in addition to MAE
+
+**Enhanced Output Tables (NEW!):**
+
+- ✅ PREDICTION_ACCURACY table (tracks prediction performance)
+- ✅ Rank column in CHANNEL_RANKINGS (1, 2, 3, ...)
+- ✅ Consensus strength in COIN_CROSS_CHANNEL (0-100 scale)
+- ✅ Recommendation column (Strong Buy/Buy/Hold/Avoid)
+- ✅ Enhanced conditional formatting (bold for Elite, italic for Unproven)
+
+**Task 5 Integration:**
+
+- ✅ Reuses HistoricalBootstrap.check_for_duplicate() for deduplication
+- ✅ Reuses atomic write pattern for archival (no data loss)
+- ✅ Reuses two-file tracking system (active vs completed)
+- ✅ Reuses signal numbering (Signal #1, #2, #3, ...)
+
+**MCP Validation:**
+
+- ✅ Event-driven architecture (Wikipedia)
+- ✅ Observer pattern (Wikipedia)
+- ✅ Callback pattern (Wikipedia)
+- ✅ Sharpe ratio (Investopedia)
+- ✅ Reinforcement learning (Wikipedia)
+- ✅ ROI calculation (Investopedia) - Task 1
+- ✅ TD learning (Wikipedia) - Task 3
 
 **ROI Integration Example**:
 

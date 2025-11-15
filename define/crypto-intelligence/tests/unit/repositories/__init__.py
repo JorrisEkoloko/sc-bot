@@ -1,1 +1,1 @@
-"""Unit tests for repository layer components."""
+"""Unit tests for repositories layer."""

@@ -285,15 +285,20 @@ class TelegramMonitor:
             if self._event_handler:
                 try:
                     self.client.remove_event_handler(self._event_handler)
-                    self._event_handler = None
-                    self._monitoring_active = False
                     self.logger.debug("Event handler removed successfully")
                 except Exception as e:
-                    self.logger.critical(f"Handler removal failed: {e} - may cause duplicate processing")
-                    # Keep reference to allow inspection but mark as inactive
+                    self.logger.critical(f"Handler removal failed: {e} - forcing disconnect to clear handlers")
+                    # Force client disconnect to clear all handlers
+                    try:
+                        await self.client.disconnect()
+                        self.connected = False
+                        self.logger.info("Forced disconnect to clear zombie handlers")
+                    except Exception as disconnect_error:
+                        self.logger.error(f"Forced disconnect also failed: {disconnect_error}")
+                finally:
+                    # Always clear handler reference and mark inactive
+                    self._event_handler = None
                     self._monitoring_active = False
-                    # Re-raise to force reconnection
-                    raise
             else:
                 self._monitoring_active = False
     

@@ -28,29 +28,38 @@ from services.reputation.reputation_calculator import ReputationCalculator
 from services.reputation.td_learning_service import TDLearningService
 from repositories.file_storage.reputation_repository import ReputationRepository
 from repositories.file_storage.coin_cross_channel_repository import CoinCrossChannelRepository
+# Task 6: Event-driven architecture
+from domain.events import SignalCompletedEvent, ReputationUpdatedEvent
 
 
 class ReputationEngine:
     """Manages channel reputations based on ROI outcomes."""
     
-    def __init__(self, data_dir: str = "data/reputation", logger=None):
+    def __init__(self, data_dir: str = "data/reputation", logger=None, event_bus=None):
         """
         Initialize reputation engine.
         
         Args:
             data_dir: Directory for storing reputation data
             logger: Optional logger instance
+            event_bus: Optional EventBus for subscribing to events (Task 6)
         """
         self.logger = logger or setup_logger('ReputationEngine')
         self.repository = ReputationRepository(data_dir, self.logger)
         self.coin_cross_channel_repo = CoinCrossChannelRepository(data_dir, self.logger)
         self.reputations: Dict[str, ChannelReputation] = {}
+        self.event_bus = event_bus  # Task 6: Event bus
         
         # Delegate TD learning to separate service (separation of concerns)
         self.td_learning_service = TDLearningService(self.logger)
         
         # Load existing reputations
         self.load_reputations()
+        
+        # Task 6: Subscribe to SignalCompletedEvent
+        if self.event_bus:
+            self.event_bus.subscribe_sync(SignalCompletedEvent, self.on_signal_completed)
+            self.logger.info("Subscribed to SignalCompletedEvent")
         
         self.logger.info(f"Reputation engine initialized with {len(self.reputations)} channels")
     
@@ -121,6 +130,22 @@ class ReputationEngine:
                 win_rate=tier_metrics['win_rate'],
                 avg_roi=tier_metrics['avg_roi'],
                 sharpe_ratio=tier_metrics['sharpe_ratio']
+            )
+        
+        # Calculate timing patterns (Task 5: Dual-metric classification)
+        timing_patterns = ReputationCalculator.calculate_timing_patterns(completed)
+        reputation.early_peaker_percentage = timing_patterns['early_peaker_percentage']
+        reputation.late_peaker_percentage = timing_patterns['late_peaker_percentage']
+        reputation.average_days_to_ath = timing_patterns['average_days_to_ath']
+        reputation.crash_rate_after_day_7 = timing_patterns['crash_rate_after_day_7']
+        reputation.recommended_hold_period = timing_patterns['recommended_hold_period']
+        
+        # Log timing pattern insights
+        if reputation.total_signals > 0:
+            self.logger.info(
+                f"Channel timing: {reputation.early_peaker_percentage:.0f}% early peakers, "
+                f"{reputation.late_peaker_percentage:.0f}% late peakers, "
+                f"avg {reputation.average_days_to_ath:.1f} days to ATH"
             )
         
         # Calculate composite reputation score
@@ -282,10 +307,88 @@ class ReputationEngine:
             coin_symbol
         )
     
-    def save_reputations(self) -> None:
-        """Save reputations using repository."""
-        self.repository.save(self.reputations)
+    # ========================================================================
+    # PART 8 TASK 6: Event-Driven Integration
+    # ========================================================================
     
-    def load_reputations(self) -> None:
-        """Load reputations using repository."""
-        self.reputations = self.repository.load()
+    async def on_signal_completed(self, event: SignalCompletedEvent) -> None:
+        """
+        Event handler for SignalCompletedEvent.
+        
+        Applies TD learning at all 3 levels when a signal completes.
+        
+        Args:
+            event: SignalCompletedEvent with outcome data
+        """
+        self.logger.info(
+            f"Received SignalCompletedEvent: {event.symbol} from {event.channel_name} "
+            f"(ATH: {event.ath_multiplier:.3f}x)"
+        )
+        
+        # Convert event to SignalOutcome for TD learning
+        outcome = SignalOutcome(
+            message_id=int(event.signal_id) if event.signal_id.isdigit() else 0,
+            channel_name=event.channel_name,
+            address=event.address,
+            symbol=event.symbol,
+            entry_price=event.entry_price,
+            entry_timestamp=event.entry_timestamp,
+            ath_price=event.ath_price,
+            ath_multiplier=event.ath_multiplier,
+            days_to_ath=event.days_to_ath,
+            is_winner=event.is_winner,
+            outcome_category=event.outcome_category,
+            is_complete=True,
+            status="completed",
+            market_tier=event.market_tier
+        )
+        
+        # Get old reputation score for comparison
+        reputation = self.reputations.get(event.channel_name)
+        old_score = reputation.reputation_score if reputation else 0.0
+        old_tier = reputation.reputation_tier if reputation else "Unproven"
+        
+        # Apply TD learning at all 3 levels
+        self.apply_td_learning(event.channel_name, outcome)
+        self.apply_coin_specific_td_learning(event.channel_name, outcome)
+        self.update_cross_channel_coin_performance(event.channel_name, outcome)
+        
+        # Save updated reputation
+        self.save_reputations()
+        
+        # Get new reputation score
+        reputation = self.reputations.get(event.channel_name)
+        new_score = reputation.reputation_score if reputation else 0.0
+        new_tier = reputation.reputation_tier if reputation else "Unproven"
+        
+        # Publish ReputationUpdatedEvent if score changed significantly (>5 points)
+        score_change = abs(new_score - old_score)
+        if score_change > 5.0 and self.event_bus:
+            import asyncio
+            reputation_event = ReputationUpdatedEvent(
+                channel_name=event.channel_name,
+                old_reputation_score=old_score,
+                new_reputation_score=new_score,
+                old_tier=old_tier,
+                new_tier=new_tier,
+                change_magnitude=score_change,
+                timestamp=datetime.now(),
+                win_rate=reputation.win_rate if reputation else 0.0,
+                avg_roi=reputation.average_roi if reputation else 1.0,
+                expected_roi=reputation.expected_roi if reputation else 1.0,
+                sharpe_ratio=reputation.sharpe_ratio if reputation else 0.0,
+                total_signals=reputation.total_signals if reputation else 0
+            )
+            try:
+                await self.event_bus.publish(reputation_event)
+                self.logger.info(
+                    f"Published ReputationUpdatedEvent: {event.channel_name} "
+                    f"{old_score:.1f} → {new_score:.1f} ({score_change:+.1f})"
+                )
+            except Exception as e:
+                self.logger.error(f"Error publishing ReputationUpdatedEvent: {e}")
+        
+        self.logger.info(
+            f"TD Learning complete for {event.channel_name}: "
+            f"Score {old_score:.1f} → {new_score:.1f}"
+        )

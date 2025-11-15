@@ -119,6 +119,13 @@ class CryptoCompareHistoricalClient(BaseAPIClient):
                         ath_candle = max(candles, key=lambda c: c.high)
                         entry_price = candles[0].open
                         
+                        # Validate that we have real price data (not all zeros)
+                        if ath_candle.high <= 0 or entry_price <= 0:
+                            self.logger.warning(
+                                f"CryptoCompare: {symbol} - {len(candles)} candles but all prices are zero (unlisted token)"
+                            )
+                            return None
+                        
                         # Calculate days to ATH
                         days_to_ath = (ath_candle.timestamp - candles[0].timestamp).total_seconds() / 86400
                         

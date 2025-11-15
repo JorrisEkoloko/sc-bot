@@ -2,54 +2,25 @@
 Message processor with HDRB scoring and analysis.
 
 Coordinates the complete message processing pipeline.
+
+Enhanced with Task 6:
+- Reputation-based confidence adjustment
+- Multi-dimensional ROI prediction
+- Prediction caching for performance
 """
 
 import time
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 from utils.logger import get_logger
 from services.analytics.hdrb_scorer import HDRBScorer
 from services.message_processing.crypto_detector import CryptoDetector
 from services.analytics.sentiment_analyzer import SentimentAnalyzer
-
-
-@dataclass
-class ProcessedMessage:
-    """Enriched message data with HDRB scores and analysis."""
-    # Original message data
-    channel_id: str
-    channel_name: str
-    message_id: int
-    message_text: str
-    timestamp: datetime
-    
-    # Engagement metrics
-    forwards: int
-    reactions: int
-    replies: int
-    views: int
-    
-    # HDRB scoring
-    hdrb_score: float          # 0-100 normalized
-    hdrb_raw: float            # Raw IC value
-    
-    # Crypto detection
-    crypto_mentions: list = field(default_factory=list)
-    is_crypto_relevant: bool = False
-    
-    # Sentiment analysis
-    sentiment: str = "neutral"
-    sentiment_score: float = 0.0
-    
-    # Confidence (will be added in Task 4)
-    confidence: float = 0.0
-    is_high_confidence: bool = False
-    
-    # Processing metadata
-    processing_time_ms: float = 0.0
-    error: Optional[str] = None
+from services.message_processing.processed_message import ProcessedMessage
+# Task 6: Reputation integration
+from utils.prediction_cache import PredictionCache
+from domain.events import PredictionMadeEvent
 
 
 class MessageProcessor:
@@ -64,7 +35,8 @@ class MessageProcessor:
     5. Calculate confidence (Task 4)
     """
     
-    def __init__(self, error_handler=None, max_ic: float = 1000.0, confidence_threshold: float = 0.7):
+    def __init__(self, error_handler=None, max_ic: float = 1000.0, confidence_threshold: float = 0.7,
+                 reputation_engine=None, event_bus=None):
         """
         Initialize message processor.
         
@@ -72,6 +44,8 @@ class MessageProcessor:
             error_handler: ErrorHandler instance for resilient processing
             max_ic: Maximum IC value for HDRB normalization
             confidence_threshold: Threshold for high-confidence classification (default: 0.7)
+            reputation_engine: Optional ReputationEngine for confidence adjustment (Task 6)
+            event_bus: Optional EventBus for publishing events (Task 6)
         """
         self.hdrb_scorer = HDRBScorer(max_ic=max_ic)
         self.crypto_detector = CryptoDetector()
@@ -79,6 +53,12 @@ class MessageProcessor:
         self.error_handler = error_handler
         self.confidence_threshold = confidence_threshold
         self.logger = get_logger('MessageProcessor')
+        
+        # Task 6: Reputation integration
+        self.reputation_engine = reputation_engine
+        self.event_bus = event_bus
+        self.prediction_cache = PredictionCache(ttl_seconds=300, logger=self.logger)  # 5 min cache
+        
         self.logger.info(f"Message processor initialized (confidence_threshold={confidence_threshold})")
     
     def _calculate_confidence(
@@ -139,6 +119,93 @@ class MessageProcessor:
             self.logger.warning(f"Error calculating confidence: {e}")
             return 0.0
     
+    def _adjust_confidence_with_reputation(
+        self,
+        base_confidence: float,
+        channel_name: str
+    ) -> tuple[float, Dict[str, Any]]:
+        """
+        Adjust confidence based on channel reputation (Task 6).
+        
+        Uses Sharpe ratio-based adjustment:
+        - Elite (Sharpe >1.5): +25% confidence boost
+        - Excellent (Sharpe 1.0-1.5): +20% confidence boost
+        - Good (Sharpe 0.5-1.0): +10% confidence boost
+        - Average (Sharpe 0.0-0.5): No adjustment
+        - Poor (Sharpe <0.0): -10% confidence reduction
+        
+        Args:
+            base_confidence: Base confidence score (0.0-1.0)
+            channel_name: Channel name
+            
+        Returns:
+            Tuple of (adjusted_confidence, reputation_data)
+        """
+        reputation_data = {
+            'reputation_score': 0.0,
+            'reputation_tier': 'Unproven',
+            'expected_roi': 1.5,
+            'sharpe_ratio': 0.0,
+            'adjustment_factor': 1.0,
+            'prediction_source': 'none'
+        }
+        
+        if not self.reputation_engine:
+            return base_confidence, reputation_data
+        
+        try:
+            # Check cache first
+            cached = self.prediction_cache.get(channel_name)
+            if cached:
+                reputation = cached
+                self.logger.debug(f"Cache hit for {channel_name}")
+            else:
+                # Load from reputation engine
+                reputation = self.reputation_engine.get_reputation(channel_name)
+                if reputation:
+                    self.prediction_cache.set(channel_name, reputation)
+                    self.logger.debug(f"Cached reputation for {channel_name}")
+            
+            if not reputation:
+                return base_confidence, reputation_data
+            
+            # Update reputation data
+            reputation_data['reputation_score'] = reputation.reputation_score
+            reputation_data['reputation_tier'] = reputation.reputation_tier
+            reputation_data['expected_roi'] = reputation.expected_roi
+            reputation_data['sharpe_ratio'] = reputation.sharpe_ratio
+            reputation_data['prediction_source'] = 'overall'
+            
+            # Calculate adjustment factor based on Sharpe ratio (MCP-validated)
+            sharpe = reputation.sharpe_ratio
+            if sharpe > 1.5:
+                adjustment_factor = 1.25  # Elite
+            elif sharpe >= 1.0:
+                adjustment_factor = 1.20  # Excellent
+            elif sharpe >= 0.5:
+                adjustment_factor = 1.10  # Good
+            elif sharpe >= 0.0:
+                adjustment_factor = 1.0   # Average
+            else:
+                adjustment_factor = 0.90  # Poor
+            
+            reputation_data['adjustment_factor'] = adjustment_factor
+            
+            # Apply adjustment
+            adjusted_confidence = base_confidence * adjustment_factor
+            adjusted_confidence = max(0.0, min(1.0, adjusted_confidence))  # Clamp to [0, 1]
+            
+            self.logger.info(
+                f"Confidence adjusted: {base_confidence:.2f} → {adjusted_confidence:.2f} "
+                f"({reputation.reputation_tier}, Sharpe={sharpe:.2f}, factor={adjustment_factor:.2f})"
+            )
+            
+            return adjusted_confidence, reputation_data
+            
+        except Exception as e:
+            self.logger.warning(f"Error adjusting confidence with reputation: {e}")
+            return base_confidence, reputation_data
+    
     def _extract_engagement_metrics(self, message_obj: Any) -> dict:
         """
         Extract engagement metrics from Telegram message object.
@@ -156,13 +223,24 @@ class MessageProcessor:
             # Extract reactions (count all reaction types)
             reactions = 0
             if hasattr(message_obj, 'reactions') and message_obj.reactions:
+                self.logger.debug(f"Reactions object: {message_obj.reactions}")
+                self.logger.debug(f"Reactions type: {type(message_obj.reactions)}")
+                self.logger.debug(f"Reactions dir: {dir(message_obj.reactions)}")
                 if hasattr(message_obj.reactions, 'results'):
+                    self.logger.debug(f"Reactions results: {message_obj.reactions.results}")
                     reactions = sum(r.count for r in message_obj.reactions.results)
+            else:
+                self.logger.debug(f"No reactions attribute or reactions is None")
             
             # Extract replies
             replies = 0
             if hasattr(message_obj, 'replies') and message_obj.replies:
+                self.logger.debug(f"Replies object: {message_obj.replies}")
+                self.logger.debug(f"Replies type: {type(message_obj.replies)}")
+                self.logger.debug(f"Replies dir: {dir(message_obj.replies)}")
                 replies = getattr(message_obj.replies, 'replies', 0) or 0
+            else:
+                self.logger.debug(f"No replies attribute or replies is None")
             
             # Extract views
             views = getattr(message_obj, 'views', 0) or 0
@@ -238,12 +316,18 @@ class MessageProcessor:
             # Step 4: Analyze sentiment
             sentiment, sentiment_score = self.sentiment_analyzer.analyze(message_text)
             
-            # Step 5: Calculate confidence
-            confidence = self._calculate_confidence(
+            # Step 5: Calculate base confidence
+            base_confidence = self._calculate_confidence(
                 hdrb_score=hdrb_result['normalized_score'],
                 crypto_mentions=crypto_mentions,
                 sentiment_score=sentiment_score,
                 message_length=len(message_text)
+            )
+            
+            # Task 6: Adjust confidence with reputation
+            confidence, reputation_data = self._adjust_confidence_with_reputation(
+                base_confidence,
+                channel_name
             )
             
             is_high_confidence = confidence >= self.confidence_threshold
@@ -275,6 +359,11 @@ class MessageProcessor:
                 sentiment_score=sentiment_score,
                 confidence=confidence,
                 is_high_confidence=is_high_confidence,
+                # Task 6: Reputation fields
+                channel_reputation_score=reputation_data['reputation_score'],
+                channel_reputation_tier=reputation_data['reputation_tier'],
+                channel_expected_roi=reputation_data['expected_roi'],
+                prediction_source=reputation_data['prediction_source'],
                 processing_time_ms=processing_time
             )
             

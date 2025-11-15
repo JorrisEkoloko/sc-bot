@@ -34,7 +34,7 @@ from services.tracking.outcome_tracker import OutcomeTracker
 from services.reputation.reputation_engine import ReputationEngine
 # Part 8 - Task 4: Historical price retrieval
 from services.pricing import HistoricalPriceRetriever
-from services.reputation import ROICalculator
+from utils.roi_calculator import ROICalculator
 # Part 8 - Task 5: Historical bootstrap with two-file tracking
 from services.reputation import HistoricalBootstrap
 from domain.bootstrap_status import BootstrapStatus
@@ -422,9 +422,58 @@ class HistoricalScraper:
                 f"reached on day {days_to_ath:.1f}"
             )
             
-            # STEP 4: Update outcome with OHLC ATH
-            # For completed signals, we have the ATH from OHLC data
-            # Checkpoints are already marked as reached in OutcomeTracker
+            # STEP 4: Update checkpoint prices from OHLC data
+            # Extract prices at day 7 and day 30 from OHLC candles
+            candles = ohlc_result.get('candles', [])
+            if candles:
+                # Find closest candle to day 7 (around day 7)
+                day_7_candle = None
+                day_30_candle = None
+                
+                for candle in candles:
+                    # Calculate days elapsed from entry timestamp
+                    # Ensure both timestamps are timezone-aware
+                    candle_ts = candle.timestamp
+                    entry_ts = outcome.entry_timestamp
+                    if candle_ts.tzinfo is None:
+                        from datetime import timezone
+                        candle_ts = candle_ts.replace(tzinfo=timezone.utc)
+                    if entry_ts.tzinfo is None:
+                        from datetime import timezone
+                        entry_ts = entry_ts.replace(tzinfo=timezone.utc)
+                    
+                    days_elapsed = (candle_ts - entry_ts).total_seconds() / 86400
+                    
+                    if 6.5 <= days_elapsed <= 7.5 and not day_7_candle:
+                        day_7_candle = candle
+                    if 29.5 <= days_elapsed <= 30.5 and not day_30_candle:
+                        day_30_candle = candle
+                
+                # Update day 7 checkpoint with actual price
+                if day_7_candle and outcome.checkpoints.get("7d"):
+                    day_7_price = day_7_candle.close
+                    outcome.checkpoints["7d"].price = day_7_price
+                    outcome.checkpoints["7d"].roi_multiplier = day_7_price / entry_price
+                    outcome.checkpoints["7d"].roi_percentage = ((day_7_price - entry_price) / entry_price) * 100
+                    self.logger.debug(f"Updated day 7 checkpoint: ${day_7_price:.6f} ({outcome.checkpoints['7d'].roi_multiplier:.3f}x)")
+                
+                # Update day 30 checkpoint with actual price
+                if day_30_candle and outcome.checkpoints.get("30d"):
+                    day_30_price = day_30_candle.close
+                    outcome.checkpoints["30d"].price = day_30_price
+                    outcome.checkpoints["30d"].roi_multiplier = day_30_price / entry_price
+                    outcome.checkpoints["30d"].roi_percentage = ((day_30_price - entry_price) / entry_price) * 100
+                    self.logger.debug(f"Updated day 30 checkpoint: ${day_30_price:.6f} ({outcome.checkpoints['30d'].roi_multiplier:.3f}x)")
+                
+                # If no exact match, use last candle for day 30 if signal is complete
+                if not day_30_candle and outcome.checkpoints.get("30d") and len(candles) >= 30:
+                    last_candle = candles[-1]
+                    day_30_price = last_candle.close
+                    outcome.checkpoints["30d"].price = day_30_price
+                    outcome.checkpoints["30d"].roi_multiplier = day_30_price / entry_price
+                    outcome.checkpoints["30d"].roi_percentage = ((day_30_price - entry_price) / entry_price) * 100
+                    self.logger.debug(f"Updated day 30 checkpoint (last candle): ${day_30_price:.6f} ({outcome.checkpoints['30d'].roi_multiplier:.3f}x)")
+            
             self.logger.info(f"Updated ATH from OHLC: ${ath_price:.6f} ({outcome.ath_multiplier:.3f}x)")
             
             # Update current price to ATH (for completed signals)
@@ -439,27 +488,41 @@ class HistoricalScraper:
             elif outcome.market_tier == "mid":
                 winner_threshold = 1.5  # 50% gain for mid cap
             
-            if outcome.ath_multiplier >= winner_threshold:
-                outcome.is_winner = True
-                outcome.outcome_category = "winner"
-                self._increment_stat('winners_classified')
-            elif outcome.ath_multiplier < 1.0:
-                outcome.is_winner = False
-                outcome.outcome_category = "loser"
-                self._increment_stat('losers_classified')
-            else:
-                outcome.is_winner = False
-                outcome.outcome_category = "break_even"
+            # Determine if signal is actually complete (≥30 days elapsed)
+            signal_status = self.historical_bootstrap.determine_signal_status(outcome.entry_timestamp)
+            outcome.status = signal_status
+            outcome.is_complete = (signal_status == "completed")
             
-            # Mark as complete
-            outcome.is_complete = True
-            outcome.status = "completed"
-            outcome.completion_reason = "30d_elapsed"
+            # Process time-based checkpoints (Task 3: Dual-metric performance classification)
+            # Check which checkpoints have been reached and process them
+            if outcome.checkpoints.get("7d") and outcome.checkpoints["7d"].reached:
+                self.outcome_tracker._process_day_7_checkpoint(outcome)
+            
+            if outcome.checkpoints.get("30d") and outcome.checkpoints["30d"].reached:
+                self.outcome_tracker._process_day_30_checkpoint(outcome)
+            
+            # Only classify as winner/loser if signal is complete (≥30 days)
+            if outcome.is_complete:
+                if outcome.ath_multiplier >= winner_threshold:
+                    outcome.is_winner = True
+                    outcome.outcome_category = "winner"
+                    self._increment_stat('winners_classified')
+                elif outcome.ath_multiplier < 1.0:
+                    outcome.is_winner = False
+                    outcome.outcome_category = "loser"
+                    self._increment_stat('losers_classified')
+                else:
+                    outcome.is_winner = False
+                    outcome.outcome_category = "break_even"
+                
+                outcome.completion_reason = "30d_elapsed"
+                self.logger.info(f"Signal COMPLETED: {outcome.outcome_category.upper()} - ATH {outcome.ath_multiplier:.3f}x")
+            else:
+                # Signal still in progress, just update ATH data
+                self.logger.info(f"Signal IN PROGRESS: ATH {outcome.ath_multiplier:.3f}x (not yet 30 days)")
             
             # Save updated outcome
             self.outcome_tracker.repository.save(self.outcome_tracker.outcomes)
-            
-            self.logger.info(f"Final result: {outcome.outcome_category.upper()} - ATH {outcome.ath_multiplier:.3f}x")
             
         except Exception as e:
             self.logger.error(f"Error updating checkpoints for {address}: {e}")

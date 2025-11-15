@@ -73,7 +73,7 @@ class DexScreenerClient(BaseAPIClient):
             self.logger.debug(f"Mapped chain '{chain}' → '{dex_chain}' for DexScreener")
         
         # Use v1 API endpoint with chain parameter
-        url = f"https://api.dexscreener.com/tokens/v1/{dex_chain}/{address}"
+        url = f"https://api.dexscreener.com/token-pairs/v1/{dex_chain}/{address}"
         
         try:
             async with self._session.get(url, timeout=self.request_timeout) as response:
@@ -140,6 +140,49 @@ class DexScreenerClient(BaseAPIClient):
         except Exception as e:
             self.logger.error(f"DexScreener exception for {address}: {e}")
             raise
+    
+    async def get_pair_info(self, address: str, chain: str) -> Optional[Dict]:
+        """
+        Get LP pair information from DexScreener.
+        
+        Used to detect if an address is an LP pair contract and extract underlying tokens.
+        
+        Args:
+            address: Contract address to check
+            chain: Blockchain name (will be mapped to DexScreener chain ID)
+            
+        Returns:
+            Pair data dictionary if found, None otherwise
+        """
+        await self._ensure_session()
+        
+        # Map generic chain name to DexScreener-specific chain ID
+        dex_chain = self.chain_mapping.get(chain.lower(), chain.lower())
+        
+        if dex_chain != chain.lower():
+            self.logger.debug(f"Mapped chain '{chain}' → '{dex_chain}' for DexScreener pair lookup")
+        
+        # Use pairs endpoint to check if address is an LP pair
+        url = f"https://api.dexscreener.com/latest/dex/pairs/{dex_chain}/{address}"
+        
+        try:
+            async with self._session.get(url, timeout=self.request_timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    pair = data.get('pair')
+                    
+                    if pair:
+                        self.logger.debug(f"Found pair data for {address[:10]}... on {dex_chain}")
+                        return pair
+                    else:
+                        self.logger.debug(f"No pair data found for {address[:10]}...")
+                else:
+                    self.logger.debug(f"DexScreener pair lookup returned {response.status} for {address}")
+                
+                return None
+        except Exception as e:
+            self.logger.debug(f"DexScreener pair lookup failed for {address}: {e}")
+            return None
     
     async def close(self):
         """Close the session."""

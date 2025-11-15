@@ -5,9 +5,16 @@ Based on verified documentation:
 - gspread: https://docs.gspread.org/en/latest/
 - Service account auth: https://docs.gspread.org/en/latest/oauth2.html
 """
+import os
+import pickle
+import time
 from pathlib import Path
 from typing import Optional
-import time
+
+import gspread
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
 from utils.logger import setup_logger
 
@@ -20,6 +27,11 @@ class GoogleSheetsMultiTable:
     TOKEN_PRICES_SHEET = "Token Prices"
     PERFORMANCE_SHEET = "Performance"
     HISTORICAL_SHEET = "Historical"
+    # Task 6: New reputation sheets
+    CHANNEL_RANKINGS_SHEET = "Channel Rankings"
+    CHANNEL_COIN_PERFORMANCE_SHEET = "Channel Coin Performance"
+    COIN_CROSS_CHANNEL_SHEET = "Coin Cross Channel"
+    PREDICTION_ACCURACY_SHEET = "Prediction Accuracy"
     
     def __init__(self, config, logger=None):
         """
@@ -44,13 +56,6 @@ class GoogleSheetsMultiTable:
     def _initialize_connection(self):
         """Initialize Google Sheets connection and setup sheets."""
         try:
-            import gspread
-            from google.oauth2.credentials import Credentials
-            from google_auth_oauthlib.flow import InstalledAppFlow
-            from google.auth.transport.requests import Request
-            import os
-            import pickle
-            
             # Authenticate based on method
             if self.config.google_auth_method == 'oauth':
                 self.logger.info("Using OAuth authentication")
@@ -102,11 +107,6 @@ class GoogleSheetsMultiTable:
     
     def _authenticate_oauth(self, gspread):
         """Authenticate using OAuth."""
-        import pickle
-        from google.oauth2.credentials import Credentials
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        from google.auth.transport.requests import Request
-        
         SCOPES = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
@@ -147,7 +147,10 @@ class GoogleSheetsMultiTable:
         sheet_configs = {
             self.MESSAGES_SHEET: [
                 'message_id', 'timestamp', 'channel_name', 'message_text',
-                'hdrb_score', 'crypto_mentions', 'sentiment', 'confidence'
+                'hdrb_score', 'crypto_mentions', 'sentiment', 'confidence',
+                'forwards', 'reactions', 'replies', 'views',
+                'channel_reputation_score', 'channel_reputation_tier',
+                'channel_expected_roi', 'prediction_source'
             ],
             self.TOKEN_PRICES_SHEET: [
                 'address', 'chain', 'symbol', 'price_usd', 'market_cap',
@@ -160,6 +163,34 @@ class GoogleSheetsMultiTable:
             self.HISTORICAL_SHEET: [
                 'address', 'chain', 'all_time_ath', 'all_time_ath_date', 'distance_from_ath',
                 'all_time_atl', 'all_time_atl_date', 'distance_from_atl'
+            ],
+            # Task 6: New reputation sheets
+            self.CHANNEL_RANKINGS_SHEET: [
+                'rank', 'channel_name', 'total_signals', 'win_rate',
+                'avg_roi', 'median_roi', 'best_roi', 'worst_roi',
+                'expected_roi', 'sharpe_ratio', 'speed_score',
+                'reputation_score', 'reputation_tier',
+                'total_predictions', 'prediction_accuracy', 'mean_absolute_error',
+                'mean_squared_error', 'first_signal_date', 'last_signal_date', 'last_updated'
+            ],
+            self.CHANNEL_COIN_PERFORMANCE_SHEET: [
+                'channel_name', 'coin_symbol', 'mentions',
+                'avg_roi', 'expected_roi', 'win_rate',
+                'best_roi', 'worst_roi', 'prediction_accuracy',
+                'sharpe_ratio', 'last_mentioned', 'days_since_last_mention',
+                'recommendation'
+            ],
+            self.COIN_CROSS_CHANNEL_SHEET: [
+                'coin_symbol', 'total_mentions', 'total_channels',
+                'avg_roi_all_channels', 'median_roi_all_channels',
+                'best_channel', 'best_channel_roi', 'best_channel_mentions',
+                'worst_channel', 'worst_channel_roi', 'worst_channel_mentions',
+                'consensus_strength', 'recommendation'
+            ],
+            self.PREDICTION_ACCURACY_SHEET: [
+                'channel_name', 'total_predictions', 'correct_predictions',
+                'accuracy_percentage', 'mean_absolute_error', 'mean_squared_error',
+                'overestimations', 'underestimations', 'avg_error_magnitude'
             ]
         }
         
@@ -197,7 +228,7 @@ class GoogleSheetsMultiTable:
         
         self.last_request_time = time.time()
     
-    async def append_to_sheet(self, sheet_name: str, row: list):
+    async def append_to_sheet(self, sheet_name: str, row: list[str]):
         """
         Append row to sheet (for append-only tables like MESSAGES).
         
@@ -225,7 +256,7 @@ class GoogleSheetsMultiTable:
             except Exception as retry_error:
                 self.logger.error(f"Retry failed for {sheet_name}: {retry_error}")
     
-    async def update_or_insert_in_sheet(self, sheet_name: str, key: str, row: list):
+    async def update_or_insert_in_sheet(self, sheet_name: str, key: str, row: list[str]):
         """
         Update existing row or insert new row (for update-or-insert tables).
         

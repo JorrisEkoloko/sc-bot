@@ -9,6 +9,7 @@ from repositories.api_clients.cryptocompare_historical_client import CryptoCompa
 from repositories.api_clients.defillama_historical_client import DefiLlamaHistoricalClient
 from repositories.api_clients.coinmarketcap_client import CoinMarketCapClient
 from repositories.api_clients.dexscreener_client import DexScreenerClient
+from repositories.api_clients.etherscan_client import EtherscanClient
 from utils.logger import setup_logger
 from utils.symbol_mapper import SymbolMapper
 
@@ -199,34 +200,39 @@ class HistoricalPriceService:
                     ) for p in prices
                 ]
                 
-                # Calculate ATH from candles
-                ath_price = max(c.high for c in candles)
-                ath_candle = next(c for c in candles if c.high == ath_price)
-                
-                # Ensure both timestamps are timezone-aware for comparison
-                ath_ts = ath_candle.timestamp
-                start_ts = start_timestamp
-                if ath_ts.tzinfo is None:
-                    from datetime import timezone
-                    ath_ts = ath_ts.replace(tzinfo=timezone.utc)
-                if start_ts.tzinfo is None:
-                    from datetime import timezone
-                    start_ts = start_ts.replace(tzinfo=timezone.utc)
-                
-                days_to_ath = (ath_ts - start_ts).total_seconds() / 86400
-                
-                data = HistoricalPriceData(
-                    symbol=symbol,
-                    price_at_timestamp=candles[0].close if candles else 0.0,
-                    ath_in_window=ath_price,
-                    ath_timestamp=ath_candle.timestamp,
-                    days_to_ath=days_to_ath,
-                    candles=candles,
-                    source='defillama'
-                )
-                self.logger.info(f"DefiLlama: {symbol} - {len(candles)} candles, ATH ${ath_price} on day {days_to_ath:.1f}")
-                self.cache.set(cache_key, data)
-                return data
+                # Validate that we have real price data (not all zeros)
+                max_price = max(c.high for c in candles) if candles else 0
+                if max_price <= 0:
+                    self.logger.warning(f"DefiLlama: {symbol} - {len(candles)} candles but all prices are zero")
+                else:
+                    # Calculate ATH from candles
+                    ath_price = max_price
+                    ath_candle = next(c for c in candles if c.high == ath_price)
+                    
+                    # Ensure both timestamps are timezone-aware for comparison
+                    ath_ts = ath_candle.timestamp
+                    start_ts = start_timestamp
+                    if ath_ts.tzinfo is None:
+                        from datetime import timezone
+                        ath_ts = ath_ts.replace(tzinfo=timezone.utc)
+                    if start_ts.tzinfo is None:
+                        from datetime import timezone
+                        start_ts = start_ts.replace(tzinfo=timezone.utc)
+                    
+                    days_to_ath = (ath_ts - start_ts).total_seconds() / 86400
+                    
+                    data = HistoricalPriceData(
+                        symbol=symbol,
+                        price_at_timestamp=candles[0].close if candles else 0.0,
+                        ath_in_window=ath_price,
+                        ath_timestamp=ath_candle.timestamp,
+                        days_to_ath=days_to_ath,
+                        candles=candles,
+                        source='defillama'
+                    )
+                    self.logger.info(f"DefiLlama: {symbol} - {len(candles)} candles, ATH ${ath_price:.6f} on day {days_to_ath:.1f}")
+                    self.cache.set(cache_key, data)
+                    return data
         
         self.logger.warning(f"No OHLC data found for {symbol} starting {start_timestamp}")
         return None

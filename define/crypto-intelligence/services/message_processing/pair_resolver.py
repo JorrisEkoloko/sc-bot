@@ -3,10 +3,11 @@
 Handles cases where extracted addresses are Uniswap/Sushiswap/etc. LP pair contracts
 instead of the actual token contracts.
 """
-import aiohttp
 from typing import Optional, Dict
 from dataclasses import dataclass
 from web3 import Web3
+
+from repositories.api_clients.dexscreener_client import DexScreenerClient
 from utils.logger import setup_logger
 
 
@@ -24,15 +25,16 @@ class PairResolution:
 class PairResolver:
     """Resolves LP pair addresses to underlying token addresses."""
     
-    def __init__(self, logger=None):
+    def __init__(self, dexscreener_client: DexScreenerClient = None, logger=None):
         """
         Initialize pair resolver.
         
         Args:
+            dexscreener_client: DexScreener API client for pair lookups
             logger: Optional logger instance
         """
         self.logger = logger or setup_logger('PairResolver')
-        self._session: Optional[aiohttp.ClientSession] = None
+        self.dexscreener_client = dexscreener_client or DexScreenerClient(logger=self.logger)
         
         # Initialize Web3 for contract calls (fallback detection)
         self.w3 = None
@@ -41,29 +43,33 @@ class PairResolver:
         self.logger.info("Pair resolver initialized")
     
     def _init_web3(self):
-        """Initialize Web3 connection for contract calls."""
-        try:
-            # Use public Ethereum RPC
-            self.w3 = Web3(Web3.HTTPProvider('https://eth.llamarpc.com', request_kwargs={'timeout': 10}))
-            if self.w3.is_connected():
-                self.logger.debug("Web3 connected for LP pair detection")
-            else:
-                self.logger.warning("Web3 connection failed - LP pair detection will be limited")
-                self.w3 = None
-        except Exception as e:
-            self.logger.warning(f"Could not initialize Web3: {e}")
-            self.w3 = None
-    
-    async def _ensure_session(self):
-        """Ensure HTTP session is initialized."""
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+        """Initialize Web3 connection for contract calls with fallback RPCs."""
+        # List of public RPC endpoints to try (in order of preference)
+        rpc_endpoints = [
+            'https://eth.llamarpc.com',
+            'https://rpc.ankr.com/eth',
+            'https://ethereum.publicnode.com'
+        ]
+        
+        for rpc_url in rpc_endpoints:
+            try:
+                self.w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={'timeout': 10}))
+                if self.w3.is_connected():
+                    self.logger.debug(f"Web3 connected to {rpc_url} for LP pair detection")
+                    return
+                else:
+                    self.logger.debug(f"Web3 connection failed for {rpc_url}, trying next...")
+            except Exception as e:
+                self.logger.debug(f"Could not connect to {rpc_url}: {e}")
+                continue
+        
+        # All RPCs failed
+        self.logger.warning("All Web3 RPC endpoints failed - LP pair detection will be limited")
+        self.w3 = None
     
     async def close(self):
-        """Close HTTP session."""
-        if self._session and not self._session.closed:
-            await self._session.close()
-            self._session = None
+        """Close DexScreener client session."""
+        await self.dexscreener_client.close()
     
     async def resolve_address(self, address: str, chain: str) -> PairResolution:
         """
@@ -85,55 +91,33 @@ class PairResolver:
             # Solana doesn't have the same LP pair confusion issue
             return PairResolution(is_pair=False)
         
-        await self._ensure_session()
-        
-        # Try DexScreener pair endpoint
+        # Try DexScreener pair endpoint via API client
         try:
-            # Map chain to DexScreener chain ID
-            chain_map = {
-                'evm': 'ethereum',
-                'ethereum': 'ethereum',
-                'eth': 'ethereum',
-                'bsc': 'bsc',
-                'polygon': 'polygon',
-                'arbitrum': 'arbitrum',
-                'avalanche': 'avalanche',
-                'optimism': 'optimism',
-                'base': 'base'
-            }
-            dex_chain = chain_map.get(chain.lower(), 'ethereum')
+            pair = await self.dexscreener_client.get_pair_info(address, chain)
             
-            # Query as pair address
-            url = f"https://api.dexscreener.com/latest/dex/pairs/{dex_chain}/{address}"
-            
-            async with self._session.get(url, timeout=5) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    pair = data.get('pair')
+            if pair:
+                # This is a pair! Extract base token
+                base_token = pair.get('baseToken', {})
+                quote_token = pair.get('quoteToken', {})
+                dex_id = pair.get('dexId', 'unknown')
+                
+                token_address = base_token.get('address')
+                token_symbol = base_token.get('symbol')
+                
+                if token_address:
+                    self.logger.info(
+                        f"Resolved LP pair {address[:10]}... to token {token_symbol} "
+                        f"({token_address[:10]}...) on {dex_id}"
+                    )
                     
-                    if pair:
-                        # This is a pair! Extract base token
-                        base_token = pair.get('baseToken', {})
-                        quote_token = pair.get('quoteToken', {})
-                        dex_id = pair.get('dexId', 'unknown')
-                        
-                        token_address = base_token.get('address')
-                        token_symbol = base_token.get('symbol')
-                        
-                        if token_address:
-                            self.logger.info(
-                                f"Resolved LP pair {address[:10]}... to token {token_symbol} "
-                                f"({token_address[:10]}...) on {dex_id}"
-                            )
-                            
-                            return PairResolution(
-                                is_pair=True,
-                                token_address=token_address,
-                                token_symbol=token_symbol,
-                                pair_type=dex_id,
-                                base_token=base_token,
-                                quote_token=quote_token
-                            )
+                    return PairResolution(
+                        is_pair=True,
+                        token_address=token_address,
+                        token_symbol=token_symbol,
+                        pair_type=dex_id,
+                        base_token=base_token,
+                        quote_token=quote_token
+                    )
         
         except Exception as e:
             self.logger.debug(f"DexScreener check failed for {address[:10]}...: {e}")
@@ -211,7 +195,6 @@ class PairResolver:
     
     async def __aenter__(self):
         """Async context manager entry."""
-        await self._ensure_session()
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):

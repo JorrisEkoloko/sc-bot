@@ -43,7 +43,8 @@ def verify_imports():
         from services.message_processing import MessageProcessor, AddressExtractor
         from services.pricing import PriceEngine, DataEnrichmentService
         from services.tracking import PerformanceTracker, OutcomeTracker
-        from services.reputation import ReputationEngine, ROICalculator
+        from services.reputation import ReputationEngine
+        from utils.roi_calculator import ROICalculator
         print("✅ Services layer imports OK")
     except Exception as e:
         errors.append(f"Services layer: {e}")

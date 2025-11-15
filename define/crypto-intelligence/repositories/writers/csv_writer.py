@@ -43,9 +43,8 @@ class CSVTableWriter:
         Args:
             row: List of values matching column order
         """
-        self._ensure_file()
-        
         try:
+            self._ensure_file()
             with open(self.current_file, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 writer.writerow(row)
@@ -53,7 +52,7 @@ class CSVTableWriter:
             self.logger.debug(f"Appended row to {self.table_name}")
         except Exception as e:
             self.logger.error(f"Failed to append row to {self.table_name}: {e}")
-            raise
+            # Don't re-raise - allow system to continue with other operations
     
     def update_or_insert(self, key: str, row: list):
         """
@@ -65,9 +64,9 @@ class CSVTableWriter:
             key: Primary key value (first column)
             row: List of values matching column order
         """
-        self._ensure_file()
-        
         try:
+            self._ensure_file()
+            
             # Read all rows
             rows = []
             if self.current_file.exists():
@@ -100,7 +99,7 @@ class CSVTableWriter:
                 
         except Exception as e:
             self.logger.error(f"Failed to update/insert row in {self.table_name}: {e}")
-            raise
+            # Don't re-raise - allow system to continue with other operations
     
     def _ensure_file(self):
         """Ensure CSV file exists with header."""
@@ -173,4 +172,17 @@ class CSVTableWriter:
         """
         rows = self.read_all_rows()
         return max(0, len(rows) - 1)  # Subtract header row
+    
+    def clear(self):
+        """
+        Clear all data rows from current file (keep header).
+        """
+        try:
+            self._ensure_file()
+            with open(self.current_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(self.columns)
+            self.logger.info(f"Cleared all data from {self.table_name}")
+        except Exception as e:
+            self.logger.error(f"Failed to clear {self.table_name}: {e}")
 

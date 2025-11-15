@@ -203,6 +203,13 @@ class ChannelReputation:
     avg_time_to_2x: float = 0.0  # Average days to 2x (winners only)
     speed_score: float = 0.0  # 0-100, faster = higher
     
+    # Timing pattern metrics (Task 5: Dual-metric classification)
+    early_peaker_percentage: float = 0.0  # % of signals that peak within 7 days
+    late_peaker_percentage: float = 0.0  # % of signals that peak after 7 days
+    average_days_to_ath: float = 0.0  # Mean days to reach ATH
+    crash_rate_after_day_7: float = 0.0  # % of signals that crash from day 7 to day 30
+    recommended_hold_period: str = ""  # "Exit early (1-7 days)" or "Hold longer (7-30 days)"
+    
     # Confidence metrics
     avg_confidence: float = 0.0  # Average entry price confidence
     avg_hdrb_score: float = 0.0  # Average HDRB score
@@ -261,6 +268,12 @@ class ChannelReputation:
             'avg_time_to_ath': self.avg_time_to_ath,
             'avg_time_to_2x': self.avg_time_to_2x,
             'speed_score': self.speed_score,
+            # Timing pattern metrics (Task 5)
+            'early_peaker_percentage': self.early_peaker_percentage,
+            'late_peaker_percentage': self.late_peaker_percentage,
+            'average_days_to_ath': self.average_days_to_ath,
+            'crash_rate_after_day_7': self.crash_rate_after_day_7,
+            'recommended_hold_period': self.recommended_hold_period,
             'avg_confidence': self.avg_confidence,
             'avg_hdrb_score': self.avg_hdrb_score,
             'tier_performance': {name: perf.to_dict() for name, perf in self.tier_performance.items()},
@@ -323,6 +336,12 @@ class ChannelReputation:
             avg_time_to_ath=data.get('avg_time_to_ath', 0.0),
             avg_time_to_2x=data.get('avg_time_to_2x', 0.0),
             speed_score=data.get('speed_score', 0.0),
+            # Timing pattern metrics (Task 5)
+            early_peaker_percentage=data.get('early_peaker_percentage', 0.0),
+            late_peaker_percentage=data.get('late_peaker_percentage', 0.0),
+            average_days_to_ath=data.get('average_days_to_ath', 0.0),
+            crash_rate_after_day_7=data.get('crash_rate_after_day_7', 0.0),
+            recommended_hold_period=data.get('recommended_hold_period', ''),
             avg_confidence=data.get('avg_confidence', 0.0),
             avg_hdrb_score=data.get('avg_hdrb_score', 0.0),
             tier_performance=tier_performance,

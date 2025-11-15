@@ -2,7 +2,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from services.tracking.outcome_tracker import OutcomeTracker
-from services.reputation.roi_calculator import ROICalculator
+from utils.roi_calculator import ROICalculator
 from domain.signal_outcome import CHECKPOINTS
 
 def test_roi_calculation():
