@@ -691,7 +691,8 @@ pytest --cov=core --cov=intelligence tests/
 
 ## 📞 Contact
 
-[Your Contact Information]
+[jorrisecko@gmail.com
+215-824-6456]
 
 ---
 
