@@ -1,6 +1,6 @@
 # Crypto Intelligence System
 
-> **Built collaboratively between AI (Kiro) and Human Developer**  
+> **Built collaboratively between AI (Kiro) and Human Engineer**  
 > A real-time cryptocurrency signal monitoring and analysis system with reputation-based intelligence
 
 ---
