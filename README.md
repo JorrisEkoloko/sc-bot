@@ -45,7 +45,7 @@ The Crypto Intelligence System is a sophisticated real-time monitoring platform 
 ### The Collaboration
 
 This system was built through an iterative collaboration between:
-- **Human Developer**: Domain expertise, requirements, and vision
+- **Human Engineer**: Domain expertise, requirements, and vision
 - **AI Assistant (Kiro)**: Architecture design, implementation, and optimization
 
 ### The Journey
