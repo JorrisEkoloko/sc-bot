@@ -19,6 +19,7 @@
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
+Google Sheets Link: "https://docs.google.com/spreadsheets/d/1WeMEaC8D4EQYmnSZPSLYLOlsr6M2tjO6hN0McRQjTog/edit?usp=sharing"
 ---
 
 ## 🎯 Overview
