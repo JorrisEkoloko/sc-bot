@@ -1,0 +1,2 @@
+address,chain,symbol,price_usd,market_cap,volume_24h,price_change_24h,liquidity_usd,pair_created_at,market_tier,risk_level,risk_score,liquidity_ratio,volume_ratio,data_completeness
+'1234567890123456789012345678901234567890,ethereum,TEST,0.00100000,1000000,50000,5.5,100000,2024-01-01,,,,,,

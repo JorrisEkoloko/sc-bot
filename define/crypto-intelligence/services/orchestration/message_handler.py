@@ -11,13 +11,13 @@ class MessageHandler:
     def __init__(
         self,
         message_processor,
-        signal_processing_service,
+        signal_processing_service,  # Can be old SignalProcessingService or new SignalCoordinator
         data_output,
         logger=None
     ):
         """Initialize message handler with dependencies."""
         self.message_processor = message_processor
-        self.signal_processing_service = signal_processing_service
+        self.signal_processing_service = signal_processing_service  # Works with both old and new
         self.data_output = data_output
         self.logger = logger or get_logger('MessageHandler')
     
@@ -33,6 +33,9 @@ class MessageHandler:
             return
         
         try:
+            import time
+            start_time = time.time()
+            
             # Process the message (HDRB, crypto detection, sentiment)
             processed = await self.message_processor.process_message(
                 channel_name=event.channel_name,
@@ -43,10 +46,15 @@ class MessageHandler:
                 channel_id=event.channel_id
             )
             
+            processing_time = (time.time() - start_time) * 1000
+            self.logger.debug(f"Message processing took {processing_time:.0f}ms")
+            
             # Process addresses if crypto relevant
             addresses_data = []
             
             if processed.is_crypto_relevant and processed.crypto_mentions:
+                signal_start = time.time()
+                
                 # Write message to MESSAGES table
                 await self.data_output.write_message({
                     'message_id': str(event.message_id),
@@ -68,7 +76,17 @@ class MessageHandler:
                 })
                 
                 # Process addresses through signal processing service
-                addresses_data = await self.signal_processing_service.process_addresses(event, processed)
+                # Works with both old SignalProcessingService.process_addresses() 
+                # and new SignalCoordinator.process_signal()
+                if hasattr(self.signal_processing_service, 'process_signal'):
+                    # New SignalCoordinator
+                    addresses_data = await self.signal_processing_service.process_signal(event, processed)
+                else:
+                    # Old SignalProcessingService
+                    addresses_data = await self.signal_processing_service.process_addresses(event, processed)
+                
+                signal_time = (time.time() - signal_start) * 1000
+                self.logger.debug(f"Signal processing took {signal_time:.0f}ms")
             
             # Display results
             self._display_processed_message(processed, addresses_data)

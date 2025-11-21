@@ -2,7 +2,7 @@
 HISTORICAL SCRAPER VERIFICATION REPORT
 ================================================================================
 
-Generated: 2025-11-14 23:32:06
+Generated: 2025-11-15 23:49:21
 
 ================================================================================
 SUMMARY STATISTICS
@@ -80,7 +80,7 @@ Channel Reputations:
     Average ROI: 11.989x (1098.9% gain)
     Sharpe Ratio: 0.38
     Speed Score: 86.6
-    Expected ROI: 12.899x
+    Expected ROI: 12.915x
 
 Total addresses in tracker: 8
 
@@ -115,7 +115,7 @@ Average confidence: 0.28
 PERFORMANCE STATISTICS
 ================================================================================
 Average processing time: 0.75ms
-Minimum processing time: 0.37ms
+Minimum processing time: 0.39ms
 Maximum processing time: 1.41ms
 ✓ Performance target met (< 100ms)
 

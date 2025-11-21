@@ -30,6 +30,7 @@ class OutcomeTracker:
         self.repository = OutcomeRepository(data_dir, self.logger)
         self.outcomes: Dict[str, SignalOutcome] = {}
         self.event_bus = event_bus  # Task 6: Event bus for publishing events
+        self._pending_events = []  # Queue for events when no event loop available
         
         # Load existing outcomes
         self.outcomes = self.repository.load()
@@ -414,11 +415,47 @@ class OutcomeTracker:
             import asyncio
             # Try to get running loop
             loop = asyncio.get_running_loop()
-            # We're in async context - schedule task
-            asyncio.create_task(self.event_bus.publish(event))
+            # We're in async context - schedule task with error handling
+            task = asyncio.create_task(self.event_bus.publish(event))
+            task.add_done_callback(lambda t: self._handle_publish_error(t, event))
         except RuntimeError:
-            # No event loop running - log warning
-            self.logger.warning(
-                f"Cannot publish {type(event).__name__} - no event loop running. "
-                f"Event will be skipped."
+            # No event loop running - queue for later publishing
+            self._pending_events.append(event)
+            self.logger.debug(
+                f"Queued {type(event).__name__} for later publishing "
+                f"({len(self._pending_events)} pending)"
             )
+    
+    def _handle_publish_error(self, task, event):
+        """Handle errors from event publishing task."""
+        try:
+            task.result()  # This will raise if the task failed
+        except Exception as e:
+            self.logger.error(
+                f"Error publishing {type(event).__name__}: {e}",
+                exc_info=True
+            )
+    
+    async def flush_pending_events(self):
+        """
+        Publish all pending events (call from async context).
+        
+        This should be called periodically from an async context to ensure
+        events queued from sync contexts are eventually published.
+        """
+        if not self.event_bus or not self._pending_events:
+            return
+        
+        events_to_publish = self._pending_events.copy()
+        self._pending_events.clear()
+        
+        self.logger.info(f"Flushing {len(events_to_publish)} pending events")
+        
+        for event in events_to_publish:
+            try:
+                await self.event_bus.publish(event)
+            except Exception as e:
+                self.logger.error(
+                    f"Error flushing {type(event).__name__}: {e}",
+                    exc_info=True
+                )

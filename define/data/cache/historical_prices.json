@@ -256,5 +256,23 @@
       }
     ],
     "source": "cryptocompare"
+  },
+  "SMOON_2025-11-11_7d": {
+    "symbol": "SMOON",
+    "price_at_timestamp": 0.0002965,
+    "ath_in_window": 0.0002965,
+    "ath_timestamp": "2025-11-11T16:04:42.706865+00:00",
+    "days_to_ath": 0.0,
+    "candles": [
+      {
+        "timestamp": "2025-11-11T16:04:42.706865+00:00",
+        "open": 0.0002965,
+        "high": 0.0002965,
+        "low": 0.0002965,
+        "close": 0.0002965,
+        "volume": 0.0
+      }
+    ],
+    "source": "dexscreener_current"
   }
 }

@@ -6,6 +6,10 @@ credentials/
 output/
 data/
 
+# Backups
+.backup_old_structure/
+.backup_*/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -31,6 +35,9 @@ wheels/
 # Logs
 logs/
 *.log
+
+# ML Models (too large for git, download separately)
+models/
 
 # IDE
 .vscode/

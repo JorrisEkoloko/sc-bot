@@ -99,6 +99,10 @@ class SignalOutcome:
     trajectory: str = ""  # Performance trend ("improved" or "crashed")
     peak_timing: str = ""  # When ATH occurred ("early_peaker" or "late_peaker")
     
+    # Dead token tracking (for fair channel ROI)
+    is_dead_token: bool = False  # True if token is dead/inactive
+    dead_token_reason: str = ""  # Reason why token is dead (e.g., "no holders", "low supply")
+    
     # Market context
     market_tier: str = ""  # micro, small, mid, large
     risk_level: str = ""

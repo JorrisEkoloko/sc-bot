@@ -1,0 +1,2 @@
+address,chain,first_message_id,start_price,start_time,ath_since_mention,ath_time,ath_multiplier,current_multiplier,days_tracked,days_to_ath,peak_timing,day_7_price,day_7_multiplier,day_7_classification,day_30_price,day_30_multiplier,day_30_classification,trajectory
+'1234567890123456789012345678901234567890,ethereum,test_msg_1,0.001,2025-11-18T15:38:33.368913+00:00,0.01,2025-11-18T15:38:33.368926+00:00,10.0,5.0,7,,,,,,,,,

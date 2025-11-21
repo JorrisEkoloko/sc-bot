@@ -13,7 +13,7 @@ from services.message_processing.address_extractor import AddressExtractor
 from services.message_processing.pair_resolver import PairResolver
 from services.pricing.price_engine import PriceEngine
 from services.tracking.performance_tracker import PerformanceTracker
-from infrastructure.output.data_output import MultiTableDataOutput
+from infrastructure.output.data_output_coordinator import DataOutputCoordinator
 from services.pricing.data_enrichment import DataEnrichmentService
 from infrastructure.scrapers.historical_scraper import HistoricalScraper
 from services.tracking.outcome_tracker import OutcomeTracker
@@ -22,9 +22,24 @@ from services.pricing import HistoricalPriceRetriever, HistoricalPriceService
 from services.reputation import HistoricalBootstrap
 from services.validation import DeadTokenDetector
 from infrastructure.event_bus import EventBus
-# New orchestration services
-from services.orchestration import SignalProcessingService, MessageHandler
+# New orchestration services (refactored)
+from services.orchestration import (
+    SignalCoordinator,
+    AddressProcessingService,
+    PriceFetchingService,
+    SignalTrackingService,
+    MessageHandler,
+    ReputationScheduler,
+    ShutdownCoordinator
+)
 from utils.logger import setup_logger
+# Multi-channel enhancements
+from infrastructure.message_queue import PriorityMessageQueue
+from infrastructure.scrapers.parallel_historical_scraper import ParallelHistoricalScraper
+
+
+# Module-level lock for thread-safe initialization across instances
+_global_init_lock = None
 
 
 class CryptoIntelligenceSystem:
@@ -50,22 +65,32 @@ class CryptoIntelligenceSystem:
         self.dead_token_detector = None
         self.historical_bootstrap = None
         self.event_bus = None
-        # Orchestration services
-        self.signal_processing_service = None
+        # Orchestration services (refactored)
+        self.address_processing_service = None
+        self.price_fetching_service = None
+        self.signal_tracking_service = None
+        self.signal_coordinator = None
         self.message_handler = None
+        # Multi-channel enhancements
+        self.priority_queue = None
+        self.parallel_scraper = None
+        # Refactored coordinators
+        self.reputation_scheduler = None
+        self.shutdown_coordinator = None
         self._state = "stopped"
         self._shutdown_lock = None
     
     async def _ensure_locks_initialized(self):
-        """Initialize async locks safely (thread-safe with double-checked locking)."""
+        """Initialize async locks safely (thread-safe with module-level lock)."""
         if self._shutdown_lock is not None:
             return
         
-        # Use a temporary lock for initialization
-        if not hasattr(self, '_init_lock'):
-            self._init_lock = asyncio.Lock()
+        # Use module-level lock for initialization (prevents race conditions)
+        global _global_init_lock
+        if _global_init_lock is None:
+            _global_init_lock = asyncio.Lock()
         
-        async with self._init_lock:
+        async with _global_init_lock:
             # Double-check after acquiring lock
             if self._shutdown_lock is not None:
                 return
@@ -73,51 +98,67 @@ class CryptoIntelligenceSystem:
             # Create lock directly in async context (safe)
             self._shutdown_lock = asyncio.Lock()
     
+    async def _transition_state(self, from_states: list, to_state: str) -> bool:
+        """
+        Atomically transition state with validation.
+        
+        Args:
+            from_states: List of valid source states
+            to_state: Target state
+            
+        Returns:
+            True if transition succeeded, False otherwise
+        """
+        async with self._shutdown_lock:
+            if self._state not in from_states:
+                return False
+            self._state = to_state
+            return True
+    
+    async def _get_state(self) -> str:
+        """Get current state atomically."""
+        async with self._shutdown_lock:
+            return self._state
+    
     async def start(self):
         """Start the system."""
         # Initialize locks in async context (thread-safe)
         await self._ensure_locks_initialized()
         
-        # Check current state and determine action (minimize critical section)
-        needs_health_check = False
+        # Perform state check and health check atomically
+        needs_restart = False
         async with self._shutdown_lock:
             if self._state == "running":
-                needs_health_check = True
+                # Health check inside lock to prevent race conditions
+                if self.telegram_monitor and self.telegram_monitor.is_connected():
+                    if self.logger:
+                        self.logger.info("System already running and healthy")
+                    return True
+                # Unhealthy - transition to restarting
+                if self.logger:
+                    self.logger.warning("System marked as running but components unhealthy, restarting...")
+                self._state = "restarting"
+                needs_restart = True
             elif self._state == "stopping":
                 raise RuntimeError("Cannot start while stopping - wait for shutdown to complete")
             elif self._state == "starting":
                 raise RuntimeError("Already starting")
             elif self._state == "stopped":
                 self._state = "starting"
+                needs_restart = False
             else:
                 raise RuntimeError(f"Cannot start from state: {self._state}")
-            
-            current_state = self._state
-        
-        # Perform health check outside lock to avoid deadlock
-        if needs_health_check:
-            if self.telegram_monitor and self.telegram_monitor.is_connected():
-                if self.logger:
-                    self.logger.info("System already running and healthy")
-                return True
-            # Unhealthy - mark for restart
-            if self.logger:
-                self.logger.warning("System marked as running but components unhealthy, restarting...")
-            async with self._shutdown_lock:
-                self._state = "restarting"
-                current_state = self._state
         
         # Perform restart cleanup if needed (outside lock to avoid deadlock)
-        if current_state == "restarting":
+        if needs_restart:
             try:
                 await self._shutdown_internal()
-                async with self._shutdown_lock:
-                    self._state = "starting"
+                if not await self._transition_state(["restarting"], "starting"):
+                    raise RuntimeError("Failed to transition to starting state after restart")
             except Exception as e:
                 if self.logger:
                     self.logger.error(f"Shutdown failed during restart: {e}")
-                async with self._shutdown_lock:
-                    self._state = "stopped"
+                await self._transition_state(["restarting"], "stopped")
                 raise
         
         try:
@@ -133,13 +174,15 @@ class CryptoIntelligenceSystem:
             setup_logger('HDRBScorer', self.config.log_level)
             setup_logger('CryptoDetector', self.config.log_level)
             setup_logger('SentimentAnalyzer', self.config.log_level)
+            setup_logger('PatternMatcher', self.config.log_level)
+            setup_logger('NLPAnalyzer', self.config.log_level)
             setup_logger('ErrorHandler', self.config.log_level)
             # Part 3 component loggers
             setup_logger('PairResolver', self.config.log_level)
             setup_logger('AddressExtractor', self.config.log_level)
             setup_logger('PriceEngine', self.config.log_level)
             setup_logger('PerformanceTracker', self.config.log_level)
-            setup_logger('MultiTableDataOutput', self.config.log_level)
+            setup_logger('DataOutputCoordinator', self.config.log_level)
             setup_logger('HistoricalScraper', self.config.log_level)
             
             self.logger.info("Configuration loaded successfully")
@@ -186,7 +229,7 @@ class CryptoIntelligenceSystem:
                 data_dir=performance_config.data_dir,
                 tracking_days=performance_config.tracking_days,
                 csv_output_dir="output",
-                enable_csv=False  # Disable CSV in tracker, use MultiTableDataOutput instead
+                enable_csv=False  # Disable CSV in tracker, use DataOutputCoordinator instead
             )
             self.logger.info("Performance tracker initialized for 7-day monitoring")
             
@@ -199,15 +242,15 @@ class CryptoIntelligenceSystem:
             
             # Multi-table data output (needs reputation_engine for table updates)
             output_config = OutputConfig.load_from_env()
-            self.data_output = MultiTableDataOutput(
+            self.data_output = DataOutputCoordinator(
                 output_config,
                 self.logger,
                 event_bus=self.event_bus,  # Task 6
                 reputation_engine=self.reputation_engine  # Task 6
             )
-            self.logger.info("Multi-table data output initialized with event subscription")
+            self.logger.info("Data output coordinator initialized with specialized writers")
             
-            # Initialize message processor with reputation engine
+            # Initialize message processor with reputation engine and event bus
             self.message_processor = MessageProcessor(
                 max_ic=self.config.processing.hdrb_max_ic,
                 confidence_threshold=self.config.processing.confidence_threshold,
@@ -215,6 +258,15 @@ class CryptoIntelligenceSystem:
                 event_bus=self.event_bus  # Task 6
             )
             self.logger.info("Message processor initialized with reputation integration")
+            
+            # Log NLP sentiment analysis status
+            nlp_enabled = os.getenv('SENTIMENT_NLP_ENABLED', 'true').lower() == 'true'
+            if nlp_enabled:
+                nlp_model = os.getenv('SENTIMENT_NLP_MODEL', 'cardiffnlp/twitter-roberta-base-sentiment-latest')
+                nlp_device = os.getenv('SENTIMENT_NLP_DEVICE', 'cpu')
+                self.logger.info(f"✨ NLP-enhanced sentiment analysis ENABLED (model: {nlp_model}, device: {nlp_device})")
+            else:
+                self.logger.info("Pattern-only sentiment analysis enabled (NLP disabled)")
             
             self.historical_price_retriever = HistoricalPriceRetriever(
                 cryptocompare_api_key=os.getenv('CRYPTOCOMPARE_API_KEY', ''),
@@ -246,28 +298,86 @@ class CryptoIntelligenceSystem:
             self.historical_bootstrap.load_existing_data()
             self.logger.info("Historical bootstrap initialized")
             
-            # Initialize orchestration services
-            self.signal_processing_service = SignalProcessingService(
+            # Initialize symbol resolver for symbol-to-address resolution
+            from services.pricing.symbol_resolver import SymbolResolver
+            self.symbol_resolver = SymbolResolver(
+                coingecko_client=self.price_engine.clients['coingecko'],
+                historical_price_service=historical_price_service,
+                logger=self.logger
+            )
+            self.logger.info("Symbol resolver initialized with date validation")
+            
+            # Initialize refactored orchestration services
+            self.logger.info("Initializing refactored orchestration services...")
+            
+            # Address processing service
+            self.address_processing_service = AddressProcessingService(
                 address_extractor=self.address_extractor,
+                symbol_resolver=self.symbol_resolver,
+                logger=self.logger
+            )
+            self.logger.info("Address processing service initialized")
+            
+            # Price fetching service
+            self.price_fetching_service = PriceFetchingService(
                 price_engine=self.price_engine,
                 data_enrichment=self.data_enrichment,
+                historical_price_retriever=self.historical_price_retriever,
+                logger=self.logger
+            )
+            self.logger.info("Price fetching service initialized")
+            
+            # Signal tracking service
+            self.signal_tracking_service = SignalTrackingService(
                 performance_tracker=self.performance_tracker,
                 outcome_tracker=self.outcome_tracker,
-                historical_price_retriever=self.historical_price_retriever,
                 dead_token_detector=self.dead_token_detector,
                 historical_bootstrap=self.historical_bootstrap,
+                logger=self.logger
+            )
+            self.logger.info("Signal tracking service initialized")
+            
+            # Signal coordinator (replaces old SignalProcessingService)
+            self.signal_coordinator = SignalCoordinator(
+                address_processing_service=self.address_processing_service,
+                price_fetching_service=self.price_fetching_service,
+                signal_tracking_service=self.signal_tracking_service,
                 data_output=self.data_output,
                 logger=self.logger
             )
-            self.logger.info("Signal processing service initialized")
+            self.logger.info("Signal coordinator initialized (refactored architecture)")
             
+            # Message handler (now uses SignalCoordinator)
             self.message_handler = MessageHandler(
                 message_processor=self.message_processor,
-                signal_processing_service=self.signal_processing_service,
+                signal_processing_service=self.signal_coordinator,  # Uses new coordinator
                 data_output=self.data_output,
                 logger=self.logger
             )
-            self.logger.info("Message handler initialized")
+            self.logger.info("Message handler initialized with refactored services")
+            
+            # Initialize priority message queue (multi-channel enhancement)
+            self.priority_queue = PriorityMessageQueue(
+                reputation_engine=self.reputation_engine,
+                max_queue_size=5000,  # Increased for ALL messages scraping
+                messages_per_second=2.0,  # Global rate limit: 2 msg/s = 120 msg/min
+                logger=self.logger
+            )
+            self.logger.info("Priority message queue initialized for multi-channel processing (queue_size=5000)")
+            
+            # Initialize reputation scheduler
+            self.reputation_scheduler = ReputationScheduler(
+                reputation_engine=self.reputation_engine,
+                outcome_tracker=self.outcome_tracker,
+                data_output=self.data_output,
+                update_interval=1800,  # 30 minutes
+                logger=self.logger
+            )
+            self.logger.info("Reputation scheduler initialized")
+            
+            # Initialize shutdown coordinator
+            self.shutdown_coordinator = ShutdownCoordinator(logger=self.logger)
+            self.logger.info("Shutdown coordinator initialized")
             
             # Create Telegram monitor
             self.telegram_monitor = TelegramMonitor(
@@ -281,7 +391,7 @@ class CryptoIntelligenceSystem:
                 await self.shutdown()
                 return False
             
-            # Initialize historical scraper
+            # Initialize historical scraper (keep original for compatibility)
             historical_config = HistoricalScraperConfig.load_from_env()
             if historical_config.enabled:
                 self.historical_scraper = HistoricalScraper(
@@ -290,26 +400,75 @@ class CryptoIntelligenceSystem:
                     self.handle_message
                 )
                 self.logger.info("Historical scraper initialized")
+                
+                # Initialize parallel scraper (multi-channel enhancement)
+                self.parallel_scraper = ParallelHistoricalScraper(
+                    historical_config,
+                    self.telegram_monitor,
+                    self.handle_message,
+                    self.reputation_engine,
+                    max_concurrent=10,  # Scrape 10 channels in parallel (increased for ALL messages)
+                    logger=self.logger
+                )
+                self.logger.info("Parallel historical scraper initialized (10 concurrent, unlimited messages)")
             else:
                 self.logger.info("Historical scraping disabled")
             
-            # Mark as running BEFORE starting monitoring (release lock first)
-            async with self._shutdown_lock:
-                self._state = "running"
+            # Start all components BEFORE marking as running (prevents race conditions)
+            self.logger.info("Starting priority queue consumer...")
+            await self.priority_queue.start_consumer(self.message_handler.handle_message)
+            self.logger.info("Priority queue consumer started")
+            
+            # Mark as running AFTER components are started (atomic transition)
+            if not await self._transition_state(["starting"], "running"):
+                # Rollback: stop components we just started
+                self.logger.error("Failed to transition to running state, rolling back...")
+                try:
+                    await self.priority_queue.stop_consumer(timeout=5.0)
+                except Exception as rollback_error:
+                    self.logger.error(f"Rollback failed: {rollback_error}")
+                raise RuntimeError("Failed to transition to running state")
             
             # Start monitoring OUTSIDE the lock (may run indefinitely)
             try:
                 # Scrape historical data if enabled
                 if historical_config.enabled:
                     try:
-                        for channel in self.config.channels:
-                            if channel.enabled:
-                                await self.historical_scraper.scrape_if_needed(channel)
+                        # Use parallel scraper for faster startup (multi-channel enhancement)
+                        if self.parallel_scraper:
+                            self.logger.info("Using parallel historical scraper (10 concurrent channels, ALL messages)")
+                            self.logger.info("⚠️  First run may take 2-8 hours depending on channel history")
+                            scrape_results = await self.parallel_scraper.scrape_all_channels(self.config.channels)
+                            self.logger.info(f"Parallel scraping results: {scrape_results}")
+                        else:
+                            # Fallback to sequential scraping
+                            self.logger.info("Using sequential historical scraper")
+                            for channel in self.config.channels:
+                                if channel.enabled:
+                                    await self.historical_scraper.scrape_if_needed(channel)
                     except asyncio.CancelledError:
-                        self.logger.info("Historical scraping cancelled, proceeding to real-time monitoring")
-                        # Don't raise - allow system to continue
+                        self.logger.info("Historical scraping cancelled")
+                        # Check if this is a shutdown cancellation
+                        current_state = await self._get_state()
+                        if current_state != "running":
+                            self.logger.info("System is shutting down, not starting monitoring")
+                            raise  # Re-raise to complete shutdown
+                        # Otherwise, proceed to monitoring
+                        self.logger.info("Proceeding to real-time monitoring")
                 
-                await self.telegram_monitor.start_monitoring(self.handle_message)
+                # Update all reputation tables on startup (for any completed signals)
+                self.logger.info("Updating reputation tables on startup...")
+                await self.reputation_scheduler.update_all_reputation_tables()
+                
+                # Start reputation scheduler
+                await self.reputation_scheduler.start()
+                
+                # Start real-time monitoring with queue-based handler
+                try:
+                    await self.telegram_monitor.start_monitoring(self.handle_message_queued)
+                finally:
+                    # Stop reputation scheduler when monitoring stops
+                    await self.reputation_scheduler.stop()
             except asyncio.CancelledError:
                 self.logger.info("Monitoring cancelled")
                 raise
@@ -320,10 +479,10 @@ class CryptoIntelligenceSystem:
             import traceback
             traceback.print_exc()
             
-            # Transition to stopping state
-            async with self._shutdown_lock:
-                if self._state != "stopped":
-                    self._state = "stopping"
+            # Transition to stopping state atomically
+            current_state = await self._get_state()
+            if current_state != "stopped":
+                await self._transition_state([current_state], "stopping")
             
             # Attempt shutdown with error recovery
             try:
@@ -332,112 +491,112 @@ class CryptoIntelligenceSystem:
                 if self.logger:
                     self.logger.error(f"Shutdown during error recovery failed: {shutdown_error}")
                 # Force state to stopped to allow retry
-                async with self._shutdown_lock:
-                    self._state = "stopped"
+                await self._transition_state(["stopping"], "stopped")
             raise
     
     async def handle_message(self, event: MessageEvent):
         """
         Handle received message - delegates to MessageHandler service.
         
+        Used for historical scraping (direct processing).
+        
         Args:
             event: Message event data
         """
         await self.message_handler.handle_message(event)
+    
+    async def handle_message_queued(self, event: MessageEvent):
+        """
+        Handle received message via priority queue (multi-channel enhancement).
+        
+        Used for real-time monitoring (queued processing with priority).
+        
+        Args:
+            event: Message event data
+        """
+        # Enqueue message with priority based on channel reputation
+        enqueued = await self.priority_queue.enqueue(event)
+        
+        if not enqueued:
+            # Queue full - message dropped (backpressure)
+            self.logger.warning(
+                f"Message dropped due to queue backpressure: "
+                f"{event.channel_name} (ID: {event.message_id})"
+            )
+            
+            # Log queue stats periodically
+            stats = self.priority_queue.get_stats()
+            if stats['total_dropped'] % 10 == 0:  # Every 10 drops
+                self.logger.warning(
+                    f"Queue stats: "
+                    f"enqueued={stats['total_enqueued']}, "
+                    f"processed={stats['total_processed']}, "
+                    f"dropped={stats['total_dropped']}, "
+                    f"queue_size={stats['queue_size']}"
+                )
+    
+    async def update_channel_reputations(self):
+        """
+        Update channel reputations based on completed signals.
+        
+        Delegates to ReputationScheduler.
+        """
+        if self.reputation_scheduler:
+            await self.reputation_scheduler.update_channel_reputations()
+        else:
+            self.logger.warning("Reputation scheduler not initialized")
     
     async def shutdown(self):
         """Shutdown the system gracefully (idempotent)."""
         # Ensure locks are initialized
         await self._ensure_locks_initialized()
         
+        # Atomic state check and transition
         async with self._shutdown_lock:
-            # Check if already stopped
             if self._state == "stopped":
+                if self.logger:
+                    self.logger.debug("System already stopped")
                 return
             
-            # Mark as stopping
+            if self._state not in ["running", "starting", "restarting", "stopping"]:
+                if self.logger:
+                    self.logger.warning(f"Cannot shutdown from state: {self._state}")
+                return
+            
+            # Transition to stopping state
             self._state = "stopping"
         
-        # Perform shutdown outside lock
-        await self._shutdown_internal()
-        
-        # Mark as stopped
-        async with self._shutdown_lock:
-            self._state = "stopped"
+        # Perform shutdown outside lock to avoid deadlock
+        try:
+            await self._shutdown_internal()
+        finally:
+            # Always mark as stopped, even if shutdown fails
+            async with self._shutdown_lock:
+                self._state = "stopped"
     
     async def _shutdown_internal(self):
-        """Internal shutdown logic (called with lock released)."""
-        if self.logger:
-            self.logger.info("Shutting down system...")
-        
-        # Disconnect Telegram monitor
-        if self.telegram_monitor:
-            try:
-                await self.telegram_monitor.disconnect()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error disconnecting Telegram: {e}")
-        
-        # Close components
-        if self.pair_resolver:
-            try:
-                await self.pair_resolver.close()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error closing pair resolver: {e}")
-        
-        if self.price_engine:
-            try:
-                await self.price_engine.close()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error closing price engine: {e}")
-        
-        if self.performance_tracker:
-            try:
-                # Save tracking data one final time
-                self.performance_tracker.save_to_disk()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error saving performance tracker: {e}")
-        
-        if self.historical_price_retriever:
-            try:
-                await self.historical_price_retriever.close()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error closing historical price retriever: {e}")
-        
-        if self.dead_token_detector:
-            try:
-                await self.dead_token_detector.close()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error closing dead token detector: {e}")
-        
-        if self.outcome_tracker:
-            try:
-                self.outcome_tracker.save_outcomes()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error saving outcome tracker: {e}")
-        
-        if self.reputation_engine:
-            try:
-                self.reputation_engine.save_reputations()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error saving reputation engine: {e}")
-        
-        if self.historical_bootstrap:
-            try:
-                self.historical_bootstrap.save_all()
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error saving historical bootstrap: {e}")
-        
-        if self.logger:
-            self.logger.info("Shutdown complete")
+        """Internal shutdown logic with guaranteed cleanup (called with lock released)."""
+        # Use shutdown coordinator for clean, organized shutdown
+        if self.shutdown_coordinator:
+            components = {
+                'priority_queue': self.priority_queue,
+                'telegram_monitor': self.telegram_monitor,
+                'pair_resolver': self.pair_resolver,
+                'price_engine': self.price_engine,
+                'historical_price_retriever': self.historical_price_retriever,
+                'dead_token_detector': self.dead_token_detector,
+                'performance_tracker': self.performance_tracker,
+                'outcome_tracker': self.outcome_tracker,
+                'reputation_engine': self.reputation_engine,
+                'historical_bootstrap': self.historical_bootstrap,
+                'reputation_scheduler': self.reputation_scheduler
+            }
+            await self.shutdown_coordinator.shutdown_all(components)
+        else:
+            # Fallback if coordinator not initialized
+            if self.logger:
+                self.logger.warning("Shutdown coordinator not available, using basic cleanup")
+                self.logger.info("Shutdown complete")
 
 
 async def main():
@@ -457,6 +616,15 @@ async def main():
         import traceback
         traceback.print_exc()
         raise
+    finally:
+        # Cancel all remaining tasks to prevent "Task was destroyed but it is pending" warnings
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        if tasks:
+            print(f"Cancelling {len(tasks)} remaining tasks...")
+            for task in tasks:
+                task.cancel()
+            # Wait for all tasks to be cancelled
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 if __name__ == '__main__':

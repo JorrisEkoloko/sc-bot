@@ -2,22 +2,27 @@
 
 Pure data access layer for loading and saving signal outcomes.
 
+FIXED: Uses TwoFileTracker for atomic active/archive operations
 Task 5 Enhancement: Two-file tracking system
 - active_tracking.json: In-progress signals (<30 days old)
 - completed_history.json: Finished signals (≥30 days old)
 
 MCP-Validated: Atomicity pattern from Wikipedia ensures no data loss during archival.
+Based on ACID properties for file operations.
 """
 import json
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 from domain.signal_outcome import SignalOutcome
 from utils.logger import setup_logger
+from utils.atomic_operations import TwoFileTracker, AtomicFileWriter, AtomicFileReader
 
 
 class OutcomeRepository:
-    """Pure data access for signal outcomes with two-file tracking system.
+    """
+    Pure data access for signal outcomes with two-file tracking system.
     
+    FIXED: Uses TwoFileTracker for atomic operations
     Implements atomic file updates to prevent data loss during archival.
     """
     
@@ -40,10 +45,23 @@ class OutcomeRepository:
         self.completed_history_file = self.data_dir / "completed_history.json"
         
         self.logger = logger or setup_logger('OutcomeRepository')
+        
+        # FIXED: Use TwoFileTracker for atomic operations
+        self.two_file_tracker = TwoFileTracker(
+            self.active_tracking_file,
+            self.completed_history_file,
+            logger
+        )
+        
+        # Legacy atomic operations
+        self.legacy_writer = AtomicFileWriter(self.outcomes_file, logger)
+        self.legacy_reader = AtomicFileReader(self.outcomes_file, logger)
     
     def save(self, outcomes: Dict[str, SignalOutcome]) -> None:
         """
-        Save outcomes to JSON file.
+        Save outcomes to JSON file (legacy method).
+        
+        FIXED: Uses AtomicFileWriter for ACID compliance
         
         Args:
             outcomes: Dictionary of address -> SignalOutcome
@@ -54,37 +72,36 @@ class OutcomeRepository:
                 for address, outcome in outcomes.items()
             }
             
-            with open(self.outcomes_file, 'w') as f:
-                json.dump(data, f, indent=2)
-            
-            self.logger.debug(f"Saved {len(outcomes)} outcomes to {self.outcomes_file}")
+            self.legacy_writer.write_json_sync(data)
+            self.logger.debug(f"Saved {len(outcomes)} outcomes")
         except Exception as e:
             self.logger.error(f"Failed to save outcomes: {e}")
+            raise
     
     def load(self) -> Dict[str, SignalOutcome]:
         """
-        Load outcomes from JSON file.
+        Load outcomes from JSON file (legacy method).
+        
+        FIXED: Uses AtomicFileReader for corruption detection
         
         Returns:
             Dictionary of address -> SignalOutcome
         """
-        if not self.outcomes_file.exists():
-            self.logger.debug("No existing outcomes file found")
+        data = self.legacy_reader.read_json(default={})
+        
+        if not data:
             return {}
         
         try:
-            with open(self.outcomes_file, 'r') as f:
-                data = json.load(f)
-            
             outcomes = {
                 address: SignalOutcome.from_dict(outcome_data)
                 for address, outcome_data in data.items()
             }
             
-            self.logger.info(f"Loaded {len(outcomes)} outcomes from {self.outcomes_file}")
+            self.logger.info(f"Loaded {len(outcomes)} outcomes")
             return outcomes
         except Exception as e:
-            self.logger.error(f"Failed to load outcomes: {e}")
+            self.logger.error(f"Failed to parse outcomes: {e}")
             return {}
     
     def get_file_path(self) -> Path:
@@ -95,11 +112,22 @@ class OutcomeRepository:
         """
         Load outcomes from two-file tracking system.
         
+        FIXED: Uses TwoFileTracker for atomic loading
+        
         Returns:
             Tuple of (active_outcomes, completed_outcomes)
         """
-        active = self._load_from_file(self.active_tracking_file)
-        completed = self._load_from_file(self.completed_history_file)
+        active_data, completed_data = self.two_file_tracker.load()
+        
+        # Convert to SignalOutcome objects
+        active = {
+            address: SignalOutcome.from_dict(data)
+            for address, data in active_data.items()
+        }
+        completed = {
+            address: SignalOutcome.from_dict(data)
+            for address, data in completed_data.items()
+        }
         
         self.logger.info(
             f"Loaded {len(active)} active signals, {len(completed)} completed signals"
@@ -115,21 +143,27 @@ class OutcomeRepository:
         """
         Save outcomes to two-file tracking system atomically.
         
+        FIXED: Uses TwoFileTracker for atomic save
         MCP-Validated: Uses atomic write pattern to prevent data loss.
         
         Args:
             active_outcomes: In-progress signals
             completed_outcomes: Finished signals
         """
-        # Save both files atomically
-        self._save_to_file(self.active_tracking_file, active_outcomes)
-        self._save_to_file(self.completed_history_file, completed_outcomes)
+        # Convert to dict format
+        active_data = {
+            address: outcome.to_dict()
+            for address, outcome in active_outcomes.items()
+        }
+        completed_data = {
+            address: outcome.to_dict()
+            for address, outcome in completed_outcomes.items()
+        }
         
-        self.logger.debug(
-            f"Saved {len(active_outcomes)} active, {len(completed_outcomes)} completed signals"
-        )
+        # Use TwoFileTracker for atomic save
+        self.two_file_tracker.save_sync(active_data, completed_data)
     
-    def archive_to_history(
+    async def archive_to_history(
         self,
         address: str,
         active_outcomes: Dict[str, SignalOutcome],
@@ -138,6 +172,7 @@ class OutcomeRepository:
         """
         Archive a signal from active to completed history atomically.
         
+        FIXED: Uses TwoFileTracker.archive_item for atomic archival
         MCP-Validated: Atomicity ensures either both operations succeed or none.
         
         Args:
@@ -152,19 +187,24 @@ class OutcomeRepository:
             self.logger.warning(f"Cannot archive {address[:10]}...: not in active tracking")
             return False
         
-        # Move signal from active to completed
-        signal = active_outcomes[address]
-        completed_outcomes[address] = signal
-        del active_outcomes[address]
+        # Convert to dict format for TwoFileTracker
+        active_data = {addr: outcome.to_dict() for addr, outcome in active_outcomes.items()}
+        completed_data = {addr: outcome.to_dict() for addr, outcome in completed_outcomes.items()}
         
-        # Save both files atomically
-        self.save_two_file_system(active_outcomes, completed_outcomes)
+        # Use TwoFileTracker for atomic archival
+        success = await self.two_file_tracker.archive_item(address, active_data, completed_data)
         
-        self.logger.info(
-            f"Archived signal {address[:10]}... (Signal #{signal.signal_number}) to history"
-        )
+        if success:
+            # Update in-memory dicts
+            signal = active_outcomes[address]
+            completed_outcomes[address] = signal
+            del active_outcomes[address]
+            
+            self.logger.info(
+                f"Archived signal {address[:10]}... (Signal #{signal.signal_number}) to history"
+            )
         
-        return True
+        return success
     
     def check_for_duplicate(
         self,
@@ -175,6 +215,7 @@ class OutcomeRepository:
         """
         Check if coin is already tracked (deduplication logic).
         
+        FIXED: Uses TwoFileTracker.check_duplicate for consistency
         MCP-Validated: Deduplication pattern from Wikipedia.
         
         Args:
@@ -188,14 +229,22 @@ class OutcomeRepository:
             - next_signal_number: Signal number for fresh start (if not duplicate)
             - previous_signals: List of previous signal IDs
         """
-        # Check active tracking first
-        if address in active_outcomes:
+        # Convert to dict format
+        active_data = {addr: outcome.to_dict() for addr, outcome in active_outcomes.items()}
+        completed_data = {addr: outcome.to_dict() for addr, outcome in completed_outcomes.items()}
+        
+        # Use TwoFileTracker for deduplication check
+        is_duplicate, archived_item = self.two_file_tracker.check_duplicate(
+            address, active_data, completed_data
+        )
+        
+        if is_duplicate:
             self.logger.debug(f"Duplicate: {address[:10]}... already in active tracking")
             return True, None, None
         
-        # Check completed history for fresh start
-        if address in completed_outcomes:
-            completed_signal = completed_outcomes[address]
+        if archived_item:
+            # Fresh start - reconstruct from archived data
+            completed_signal = SignalOutcome.from_dict(archived_item)
             next_number = completed_signal.signal_number + 1
             previous_signals = completed_signal.previous_signals + [completed_signal.message_id]
             

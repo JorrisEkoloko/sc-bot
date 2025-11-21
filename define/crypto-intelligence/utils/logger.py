@@ -83,24 +83,44 @@ def setup_logger(name: str, level: str = 'INFO') -> logging.Logger:
     )
     console_handler.setFormatter(console_format)
     
-    # File handler with rotation
+    # File handler with rotation (Windows-safe configuration)
+    # Fixed: Windows PermissionError during log rotation when process is interrupted
     log_file = log_dir / f'crypto_intelligence_{datetime.now().strftime("%Y-%m-%d")}.log'
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=7,  # Keep 7 days
-        encoding='utf-8'
-    )
-    file_handler.setLevel(log_level)
-    file_format = logging.Formatter(
-        '[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(file_format)
-    
-    # Add handlers
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    try:
+        # Use a custom RotatingFileHandler that's safer on Windows
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=7,  # Keep 7 days
+            encoding='utf-8',
+            delay=True  # Delay file opening until first write
+        )
+        
+        # Override the doRollover method to handle Windows permission errors
+        # This prevents crashes when the log file is locked during shutdown/interruption
+        original_doRollover = file_handler.doRollover
+        def safe_doRollover():
+            try:
+                original_doRollover()
+            except (PermissionError, OSError) as e:
+                # Silently ignore rotation errors on Windows during shutdown
+                pass
+        file_handler.doRollover = safe_doRollover
+        
+        file_handler.setLevel(log_level)
+        file_format = logging.Formatter(
+            '[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(file_format)
+        
+        # Add handlers
+        logger.addHandler(console_handler)
+        logger.addHandler(file_handler)
+    except Exception as e:
+        # If file handler fails (e.g., during shutdown), just use console
+        print(f"Warning: Could not create file handler: {e}. Using console only.")
+        logger.addHandler(console_handler)
     
     return logger
 

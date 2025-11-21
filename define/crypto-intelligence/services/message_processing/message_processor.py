@@ -20,7 +20,6 @@ from services.analytics.sentiment_analyzer import SentimentAnalyzer
 from services.message_processing.processed_message import ProcessedMessage
 # Task 6: Reputation integration
 from utils.prediction_cache import PredictionCache
-from domain.events import PredictionMadeEvent
 
 
 class MessageProcessor:
@@ -40,6 +39,8 @@ class MessageProcessor:
         """
         Initialize message processor.
         
+        FIXED: Issue #11 - Uses EventPublisher for safe event publishing
+        
         Args:
             error_handler: ErrorHandler instance for resilient processing
             max_ic: Maximum IC value for HDRB normalization
@@ -54,10 +55,14 @@ class MessageProcessor:
         self.confidence_threshold = confidence_threshold
         self.logger = get_logger('MessageProcessor')
         
-        # Task 6: Reputation integration
+        # Task 6: Reputation integration and event publishing
         self.reputation_engine = reputation_engine
         self.event_bus = event_bus
         self.prediction_cache = PredictionCache(ttl_seconds=300, logger=self.logger)  # 5 min cache
+        
+        # FIXED: Issue #11 - Use EventPublisher with task tracking
+        from utils.async_helpers import EventPublisher
+        self.event_publisher = EventPublisher(event_bus, "MessageProcessor") if event_bus else None
         
         self.logger.info(f"Message processor initialized (confidence_threshold={confidence_threshold})")
     
@@ -118,6 +123,69 @@ class MessageProcessor:
         except Exception as e:
             self.logger.warning(f"Error calculating confidence: {e}")
             return 0.0
+    
+    def _publish_prediction_event(
+        self,
+        channel_name: str,
+        crypto_mentions: list[str],
+        reputation_data: Dict[str, Any],
+        confidence: float
+    ) -> None:
+        """
+        Publish PredictionMadeEvent for analytics (Task 6).
+        
+        Args:
+            channel_name: Channel name
+            crypto_mentions: List of detected crypto mentions
+            reputation_data: Reputation data dictionary
+            confidence: Adjusted confidence score
+        """
+        try:
+            from domain.events import PredictionMadeEvent
+            from datetime import datetime, timezone
+            
+            # Use first crypto mention as primary symbol
+            primary_symbol = crypto_mentions[0] if crypto_mentions else "unknown"
+            
+            event = PredictionMadeEvent(
+                channel_name=channel_name,
+                coin_symbol=primary_symbol,
+                address="",  # Will be filled by address extractor later
+                overall_prediction=reputation_data['expected_roi'],
+                coin_specific_prediction=None,  # TODO: Implement coin-specific predictions
+                cross_channel_prediction=None,  # TODO: Implement cross-channel predictions
+                weighted_prediction=reputation_data['expected_roi'],
+                confidence_interval=confidence,
+                prediction_source=reputation_data['prediction_source'],
+                timestamp=datetime.now(timezone.utc),
+                metadata={
+                    'reputation_score': reputation_data['reputation_score'],
+                    'reputation_tier': reputation_data['reputation_tier'],
+                    'sharpe_ratio': reputation_data['sharpe_ratio'],
+                    'adjustment_factor': reputation_data['adjustment_factor']
+                }
+            )
+            
+            # Publish event safely (handles both sync and async contexts)
+            self._publish_event_safe(event)
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to publish prediction event: {e}")
+    
+    def _publish_event_safe(self, event):
+        """
+        Publish event safely from any context (sync or async).
+        
+        FIXED: Issue #11 - Async/Sync Boundary Conflicts
+        Uses EventPublisher with task tracking to prevent GC.
+        
+        Args:
+            event: Event to publish
+        """
+        if not self.event_publisher:
+            return
+        
+        self.event_publisher.publish_safe(event)
     
     def _adjust_confidence_with_reputation(
         self,
@@ -313,8 +381,18 @@ class MessageProcessor:
             crypto_mentions = self.crypto_detector.detect_mentions(message_text)
             is_crypto_relevant = self.crypto_detector.is_crypto_relevant(crypto_mentions, message_text)
             
-            # Step 4: Analyze sentiment
-            sentiment, sentiment_score = self.sentiment_analyzer.analyze(message_text)
+            # Step 4: Analyze sentiment (using NLP-enhanced analysis)
+            sentiment_result = self.sentiment_analyzer.analyze_detailed(message_text)
+            sentiment = sentiment_result.label
+            sentiment_score = sentiment_result.score
+            
+            # Log sentiment analysis details
+            self.logger.info(
+                f"Sentiment: {sentiment} ({sentiment_score:+.2f}) | "
+                f"Method: {sentiment_result.method} | "
+                f"Confidence: {sentiment_result.confidence:.2f} | "
+                f"Time: {sentiment_result.processing_time_ms:.1f}ms"
+            )
             
             # Step 5: Calculate base confidence
             base_confidence = self._calculate_confidence(
@@ -329,6 +407,15 @@ class MessageProcessor:
                 base_confidence,
                 channel_name
             )
+            
+            # Task 6: Publish PredictionMadeEvent if we have crypto mentions
+            if crypto_mentions and self.event_bus and reputation_data['prediction_source'] != 'none':
+                self._publish_prediction_event(
+                    channel_name=channel_name,
+                    crypto_mentions=crypto_mentions,
+                    reputation_data=reputation_data,
+                    confidence=confidence
+                )
             
             is_high_confidence = confidence >= self.confidence_threshold
             

@@ -11,6 +11,10 @@ class ProcessingConfig:
     min_message_length: int = 10
     max_processing_time_ms: float = 100.0
     
+    # Timeout configurations for async operations (in seconds)
+    historical_price_timeout: float = 30.0  # Timeout for historical price fetches
+    ohlc_fetch_timeout: float = 20.0  # Timeout for OHLC data fetches
+    
     @classmethod
     def load_from_env(cls) -> 'ProcessingConfig':
         """Load processing configuration from environment variables."""
@@ -34,9 +38,21 @@ class ProcessingConfig:
         except ValueError:
             max_processing_time_ms = 100.0
         
+        try:
+            historical_price_timeout = float(os.getenv('HISTORICAL_PRICE_TIMEOUT', '30.0'))
+        except ValueError:
+            historical_price_timeout = 30.0
+        
+        try:
+            ohlc_fetch_timeout = float(os.getenv('OHLC_FETCH_TIMEOUT', '20.0'))
+        except ValueError:
+            ohlc_fetch_timeout = 20.0
+        
         return cls(
             confidence_threshold=confidence_threshold,
             hdrb_max_ic=hdrb_max_ic,
             min_message_length=min_message_length,
-            max_processing_time_ms=max_processing_time_ms
+            max_processing_time_ms=max_processing_time_ms,
+            historical_price_timeout=historical_price_timeout,
+            ohlc_fetch_timeout=ohlc_fetch_timeout
         )

@@ -17,6 +17,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
 from utils.logger import setup_logger
+from utils.key_normalizer import KeyNormalizer
 
 
 class GoogleSheetsMultiTable:
@@ -48,7 +49,8 @@ class GoogleSheetsMultiTable:
         self.spreadsheet = None
         self.sheets = {}
         self.last_request_time = 0
-        self.min_request_interval = 1.0  # 1 second between requests for rate limiting
+        self.min_request_interval = 2.0  # 2 seconds between requests for rate limiting (Google Sheets limit: 60 writes/min)
+        self.retry_delays = [2, 5, 10]  # Exponential backoff delays
         
         # Initialize connection
         self._initialize_connection()
@@ -157,11 +159,13 @@ class GoogleSheetsMultiTable:
                 'volume_24h', 'price_change_24h', 'liquidity_usd', 'pair_created_at'
             ],
             self.PERFORMANCE_SHEET: [
-                'address', 'chain', 'first_message_id', 'start_price', 'start_time',
-                'ath_since_mention', 'ath_time', 'ath_multiplier', 'current_multiplier', 'days_tracked'
+                'address', 'chain', 'symbol', 'first_message_id', 'start_price', 'start_time',
+                'ath_since_mention', 'ath_time', 'ath_multiplier', 'current_multiplier', 'days_tracked',
+                'days_to_ath', 'peak_timing', 'day_7_price', 'day_7_multiplier', 'day_7_classification',
+                'day_30_price', 'day_30_multiplier', 'day_30_classification', 'trajectory'
             ],
             self.HISTORICAL_SHEET: [
-                'address', 'chain', 'all_time_ath', 'all_time_ath_date', 'distance_from_ath',
+                'address', 'chain', 'symbol', 'all_time_ath', 'all_time_ath_date', 'distance_from_ath',
                 'all_time_atl', 'all_time_atl_date', 'distance_from_atl'
             ],
             # Task 6: New reputation sheets
@@ -240,21 +244,33 @@ class GoogleSheetsMultiTable:
             self.logger.error(f"Sheet not found: {sheet_name}")
             return
         
-        try:
-            self._rate_limit()
-            sheet = self.sheets[sheet_name]
-            sheet.append_row([str(v) if v is not None else '' for v in row])
-            self.logger.debug(f"Appended row to {sheet_name}")
-        except Exception as e:
-            self.logger.error(f"Failed to append to {sheet_name}: {e}")
-            # Retry once after delay
+        sheet = self.sheets[sheet_name]
+        str_row = [str(v) if v is not None else '' for v in row]
+        
+        # Retry with exponential backoff
+        for attempt, delay in enumerate([0] + self.retry_delays):
             try:
-                time.sleep(2)
+                if attempt > 0:
+                    self.logger.warning(f"Retry attempt {attempt} for {sheet_name} after {delay}s delay")
+                    time.sleep(delay)
+                
                 self._rate_limit()
-                sheet.append_row([str(v) if v is not None else '' for v in row])
-                self.logger.info(f"Retry successful for {sheet_name}")
-            except Exception as retry_error:
-                self.logger.error(f"Retry failed for {sheet_name}: {retry_error}")
+                sheet.append_row(str_row)
+                self.logger.debug(f"Appended row to {sheet_name}")
+                return
+                
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "Quota exceeded" in error_msg:
+                    if attempt < len(self.retry_delays):
+                        self.logger.warning(f"Rate limit hit for {sheet_name}, will retry...")
+                        continue
+                    else:
+                        self.logger.error(f"Rate limit exceeded after all retries for {sheet_name}, skipping")
+                        return
+                else:
+                    self.logger.error(f"Failed to append to {sheet_name}: {e}")
+                    return
     
     async def update_or_insert_in_sheet(self, sheet_name: str, key: str, row: list[str]):
         """
@@ -276,12 +292,19 @@ class GoogleSheetsMultiTable:
             self._rate_limit()
             all_values = sheet.get_all_values()
             
+            # Normalize key for comparison using KeyNormalizer
+            normalized_key = KeyNormalizer.normalize_key_by_column(key, 0, sheet_name)
+            
             # Find row with matching key (skip header)
             row_index = None
             for i, existing_row in enumerate(all_values[1:], start=2):  # Start at row 2 (after header)
-                if existing_row and existing_row[0] == key:
-                    row_index = i
-                    break
+                if existing_row:
+                    # Normalize existing key for comparison using KeyNormalizer
+                    existing_key = KeyNormalizer.normalize_key_by_column(existing_row[0], 0, sheet_name)
+                    
+                    if existing_key == normalized_key:
+                        row_index = i
+                        break
             
             # Convert row values to strings
             str_row = [str(v) if v is not None else '' for v in row]
@@ -291,16 +314,123 @@ class GoogleSheetsMultiTable:
                 self._rate_limit()
                 cell_range = f'A{row_index}:{chr(65 + len(row) - 1)}{row_index}'
                 sheet.update(cell_range, [str_row])
-                self.logger.debug(f"Updated row in {sheet_name} (key: {key[:10]}...)")
+                self.logger.debug(f"Updated row in {sheet_name} (key: {normalized_key[:10]}...)")
             else:
                 # Insert new row
                 self._rate_limit()
                 sheet.append_row(str_row)
-                self.logger.debug(f"Inserted new row in {sheet_name} (key: {key[:10]}...)")
+                self.logger.debug(f"Inserted new row in {sheet_name} (key: {normalized_key[:10]}...)")
                 
         except Exception as e:
             self.logger.error(f"Failed to update/insert in {sheet_name}: {e}")
             # Don't retry for update_or_insert to avoid duplicates
+    
+    async def update_or_insert_in_sheet_composite(self, sheet_name: str, key_values: list, row: list[str]):
+        """
+        Update existing row or insert new row using composite key.
+        
+        Args:
+            sheet_name: Name of the sheet
+            key_values: List of values for composite key (e.g., [address, message_id])
+            row: List of values to write
+        """
+        if sheet_name not in self.sheets:
+            self.logger.error(f"Sheet not found: {sheet_name}")
+            return
+        
+        try:
+            sheet = self.sheets[sheet_name]
+            
+            # Get all values (limit to first 10,000 rows for performance)
+            self._rate_limit()
+            all_values = sheet.get_all_values()
+            
+            # Define key column indices for each sheet type
+            # Performance: [address, symbol, first_message_id] at columns [0, 2, 3]
+            # Channel Coin Performance: [channel_name, coin_symbol] at columns [0, 1]
+            # Others: sequential from column 0
+            if sheet_name == 'Performance':
+                key_column_indices = [0, 2, 3]  # address at col 0, symbol at col 2, first_message_id at col 3
+            elif sheet_name == 'Channel Coin Performance':
+                key_column_indices = [0, 1]  # channel_name at col 0, coin_symbol at col 1
+            else:
+                # Default: use first N columns sequentially
+                key_column_indices = list(range(len(key_values)))
+            
+            # Normalize key values for comparison using KeyNormalizer
+            normalized_keys = KeyNormalizer.normalize_composite_key(
+                key_values, key_column_indices, sheet_name
+            )
+            
+            # Find row with matching composite key (skip header)
+            row_index = None
+            for i, existing_row in enumerate(all_values[1:], start=2):  # Start at row 2 (after header)
+                if existing_row and len(existing_row) > max(key_column_indices):
+                    # Extract and normalize existing row values using KeyNormalizer
+                    existing_key_values = [existing_row[col_idx] for col_idx in key_column_indices]
+                    existing_keys = KeyNormalizer.normalize_composite_key(
+                        existing_key_values, key_column_indices, sheet_name
+                    )
+                    
+                    # Check if all key columns match
+                    if existing_keys == normalized_keys:
+                        row_index = i
+                        break
+            
+            # Convert row values to strings
+            str_row = [str(v) if v is not None else '' for v in row]
+            
+            if row_index:
+                # Update existing row
+                self._rate_limit()
+                cell_range = f'A{row_index}:{chr(65 + len(row) - 1)}{row_index}'
+                sheet.update(cell_range, [str_row])
+                key_str = '|'.join(str(k)[:10] for k in normalized_keys)
+                self.logger.debug(f"Updated row in {sheet_name} (key: {key_str}...)")
+            else:
+                # Insert new row
+                self._rate_limit()
+                sheet.append_row(str_row)
+                key_str = '|'.join(str(k)[:10] for k in normalized_keys)
+                self.logger.debug(f"Inserted new row in {sheet_name} (key: {key_str}...)")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to update/insert with composite key in {sheet_name}: {e}")
+            # Don't retry for update_or_insert to avoid duplicates
+    
+    async def clear_sheet(self, sheet_name: str):
+        """
+        Clear all data from a sheet except the header row.
+        
+        Args:
+            sheet_name: Name of the sheet to clear
+        """
+        if sheet_name not in self.sheets:
+            self.logger.error(f"Sheet not found: {sheet_name}")
+            return
+        
+        try:
+            sheet = self.sheets[sheet_name]
+            
+            # Get all values to determine how many rows to clear
+            self._rate_limit()
+            all_values = sheet.get_all_values()
+            
+            if len(all_values) <= 1:
+                # Only header row exists, nothing to clear
+                self.logger.debug(f"Sheet {sheet_name} already empty (only header)")
+                return
+            
+            # Clear all rows except header (row 1)
+            # Delete rows 2 onwards
+            num_rows_to_delete = len(all_values) - 1
+            if num_rows_to_delete > 0:
+                self._rate_limit()
+                sheet.delete_rows(2, len(all_values))
+                self.logger.debug(f"Cleared {num_rows_to_delete} rows from {sheet_name}")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to clear sheet {sheet_name}: {e}")
     
     def close(self):
         """Close connection (no-op for gspread)."""

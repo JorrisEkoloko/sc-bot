@@ -76,7 +76,7 @@ class PerformanceTracker:
         self.logger.info(f"Performance tracker initialized (tracking {tracking_days} days, CSV: {enable_csv})")
     
     async def start_tracking(self, address: str, chain: str, initial_price: float, message_id: str = "unknown",
-                           known_ath: Optional[float] = None):
+                           known_ath: Optional[float] = None, symbol: Optional[str] = None):
         """
         Start tracking a new address.
         
@@ -86,6 +86,7 @@ class PerformanceTracker:
             initial_price: Starting price in USD
             message_id: ID of first message mentioning this address
             known_ath: Optional known ATH from APIs (coin's real all-time high)
+            symbol: Optional token symbol
         """
         if address in self.tracking_data:
             self.logger.debug(f"Address {address[:10]}... already tracked")
@@ -95,6 +96,7 @@ class PerformanceTracker:
         self.tracking_data[address] = {
             'address': address,
             'chain': chain,
+            'symbol': symbol,
             'first_message_id': message_id,
             'start_price': initial_price,
             'start_time': now.isoformat(),
@@ -196,6 +198,7 @@ class PerformanceTracker:
         return PerformanceData(
             address=address,
             chain=entry['chain'],
+            symbol=entry.get('symbol'),
             first_message_id=entry.get('first_message_id', 'unknown'),
             start_price=entry['start_price'],
             start_time=entry['start_time'],

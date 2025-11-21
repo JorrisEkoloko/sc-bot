@@ -1,0 +1,2 @@
+[2025-11-17 21:46:13] [INFO] [DataCleaner] Using OAuth authentication
+[2025-11-17 21:46:13] [ERROR] [DataCleaner] Failed to initialize Google Sheets: OAuth credentials file not found: credentials\oauth_credentials.json

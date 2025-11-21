@@ -1,0 +1,22 @@
+[2025-11-18 14:27:28] [ERROR] [UpdateSheetsHeaders] Google Sheets is not enabled in config
+[2025-11-18 14:27:47] [INFO] [UpdateSheetsHeaders] Connecting to Google Sheets...
+[2025-11-18 14:27:47] [INFO] [UpdateSheetsHeaders] Using OAuth authentication
+[2025-11-18 14:27:47] [ERROR] [UpdateSheetsHeaders] Failed to initialize Google Sheets: OAuth credentials file not found: credentials\oauth_credentials.json
+[2025-11-18 14:27:47] [ERROR] [UpdateSheetsHeaders] Failed to update Google Sheets headers: OAuth credentials file not found: credentials\oauth_credentials.json
+[2025-11-18 14:27:47] [ERROR] [UpdateSheetsHeaders] Traceback (most recent call last):
+  File "C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\scripts\update_sheets_headers.py", line 34, in update_sheets_headers
+    sheets_writer = GoogleSheetsMultiTable(config, logger)
+  File "C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\repositories\writers\sheets_writer.py", line 55, in __init__
+    self._initialize_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\repositories\writers\sheets_writer.py", line 63, in _initialize_connection
+    self.client = self._authenticate_oauth(gspread)
+                  ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\jorri\OneDrive\Desktop\define\crypto-intelligence\repositories\writers\sheets_writer.py", line 132, in _authenticate_oauth
+    raise FileNotFoundError(f"OAuth credentials file not found: {credentials_file}")
+FileNotFoundError: OAuth credentials file not found: credentials\oauth_credentials.json
+
+[2025-11-18 22:36:54] [WARNING] [TokenFilter] Failed to load filtering keywords from JSON: [Errno 2] No such file or directory: 'C:\\Users\\jorri\\OneDrive\\Desktop\\define\\crypto-intelligence\\services\\config\\filtering_keywords.json'. Using defaults.
+[2025-11-18 22:36:54] [WARNING] [TokenFilter] Failed to load filtering keywords from JSON: [Errno 2] No such file or directory: 'C:\\Users\\jorri\\OneDrive\\Desktop\\define\\crypto-intelligence\\services\\config\\filtering_keywords.json'. Using defaults.
+[2025-11-18 22:36:54] [WARNING] [TokenFilter] Failed to load filtering keywords from JSON: [Errno 2] No such file or directory: 'C:\\Users\\jorri\\OneDrive\\Desktop\\define\\crypto-intelligence\\services\\config\\filtering_keywords.json'. Using defaults.
+[2025-11-18 22:36:54] [WARNING] [TokenFilter] Failed to load filtering keywords from JSON: [Errno 2] No such file or directory: 'C:\\Users\\jorri\\OneDrive\\Desktop\\define\\crypto-intelligence\\services\\config\\filtering_keywords.json'. Using defaults.

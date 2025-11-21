@@ -1,0 +1,3 @@
+address,chain,symbol,price_usd,market_cap,volume_24h,price_change_24h,liquidity_usd,pair_created_at,market_tier,risk_level,risk_score,liquidity_ratio,volume_ratio,data_completeness
+'0x1234567890123456789012345678901234567890,ethereum,TINY,0.00000100,1000,500,5.5,1000,2024-01-01,,,,,,
+'9999999999999999999999999999999999999999,solana,TEST2,0.000000001230,1000,500,5.5,1000,2024-01-01,,,,,,

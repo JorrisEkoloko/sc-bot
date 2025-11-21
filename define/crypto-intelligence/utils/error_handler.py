@@ -44,6 +44,10 @@ class CircuitBreaker:
         """
         Initialize circuit breaker.
         
+        FIXED: Issue #1 - Context Manager Interference
+        Removed threading lock to prevent sync/async mixing.
+        Lock is now created only in async context.
+        
         Args:
             failure_threshold: Number of consecutive failures before opening circuit
             timeout: Seconds to wait before attempting recovery
@@ -54,11 +58,6 @@ class CircuitBreaker:
         self.last_failure_time: Optional[float] = None
         self.state = CircuitState.CLOSED
         self._state_lock = None  # Will be initialized in async context
-        self._lock_initialized = False  # Track if lock is ready
-        
-        # Initialize threading lock for bootstrap (safe across sync/async boundary)
-        import threading
-        self._bootstrap_lock = threading.Lock()
         
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"Circuit breaker initialized (threshold={failure_threshold}, timeout={timeout}s)")
@@ -93,19 +92,16 @@ class CircuitBreaker:
             raise e
     
     async def _ensure_lock_initialized(self):
-        """Initialize async lock in a thread-safe manner (double-checked locking)."""
-        if self._lock_initialized:
-            return
+        """
+        Initialize async lock safely.
         
-        # Use threading lock for bootstrap (safe across sync/async boundary)
-        with self._bootstrap_lock:
-            # Double-check after acquiring lock
-            if self._lock_initialized:
-                return
-            
-            # Create the async state lock
+        FIXED: Issue #1 - Removed threading lock to prevent deadlock.
+        Uses simple check since this is only called from async context.
+        
+        Based on PEP 492: Async operations should not mix with sync primitives.
+        """
+        if self._state_lock is None:
             self._state_lock = asyncio.Lock()
-            self._lock_initialized = True
             self.logger.debug("Circuit breaker lock initialized")
     
     async def call_async(self, func: Callable, *args, **kwargs) -> Any:

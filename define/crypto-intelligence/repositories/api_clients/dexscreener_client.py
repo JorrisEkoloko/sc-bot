@@ -109,9 +109,21 @@ class DexScreenerClient(BaseAPIClient):
                         volume = pair.get('volume', {})
                         volume_24h = volume.get('h24')
                         
-                        # Extract symbol from baseToken
+                        # Extract symbol - prefer pair name for LP tokens, otherwise use base token
                         base_token = pair.get('baseToken', {})
-                        symbol = base_token.get('symbol')
+                        quote_token = pair.get('quoteToken', {})
+                        
+                        # Check if this is an LP pair (has both base and quote tokens)
+                        base_symbol = base_token.get('symbol', '')
+                        quote_symbol = quote_token.get('symbol', '')
+                        
+                        # If both tokens exist, create LP pair symbol
+                        if base_symbol and quote_symbol:
+                            symbol = f"{base_symbol}/{quote_symbol}"
+                            self.logger.debug(f"LP pair detected: {symbol}")
+                        else:
+                            # Single token, use base symbol
+                            symbol = base_symbol
                         
                         # Extract liquidity
                         liquidity = pair.get('liquidity', {})
@@ -137,6 +149,10 @@ class DexScreenerClient(BaseAPIClient):
                     self.logger.warning(f"DexScreener HTTP {response.status} for {address}: {response_text[:200]}")
                 
                 return None
+        except asyncio.CancelledError:
+            # System is shutting down - stop immediately
+            self.logger.debug(f"DexScreener request cancelled for {address}")
+            raise  # Re-raise to propagate cancellation
         except Exception as e:
             self.logger.error(f"DexScreener exception for {address}: {e}")
             raise

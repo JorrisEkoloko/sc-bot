@@ -19,6 +19,7 @@ from repositories.api_clients import (
     BlockscoutClient,
     GoPlusClient
 )
+from infrastructure.blockchain import ContractReader
 from utils.rate_limiter import RateLimiter
 from utils.logger import setup_logger
 import os
@@ -31,6 +32,8 @@ class PriceEngine:
         """
         Initialize price engine.
         
+        FIXED: Issue #10 - Added _closing flag to track partial cleanup
+        
         Args:
             config: Price configuration
             logger: Optional logger instance
@@ -38,6 +41,7 @@ class PriceEngine:
         # Initialize close lock immediately to prevent race conditions
         self._close_lock = asyncio.Lock()
         self._closed = False
+        self._closing = False  # Track if currently closing
         
         self.config = config
         self.logger = logger or setup_logger('PriceEngine')
@@ -74,6 +78,9 @@ class PriceEngine:
         # Initialize cache (5-minute TTL)
         self.cache = TTLCache(maxsize=1000, ttl=config.cache_ttl)
         
+        # Initialize contract reader for blockchain interactions
+        self.contract_reader = ContractReader(logger=self.logger)
+        
         # Initialize rate limiters (90% of actual limits)
         self.rate_limiters = {
             'coingecko': RateLimiter(int(50 * config.rate_limit_buffer), 60),
@@ -89,17 +96,31 @@ class PriceEngine:
         self.logger.info("Price engine initialized with 7 APIs (CoinGecko, Birdeye, Moralis, DefiLlama, DexScreener, Blockscout, GoPlus)")
     
     async def close(self):
-        """Close all API client sessions (idempotent)."""
+        """
+        Close all API client sessions (idempotent).
+        
+        FIXED: Issue #10 - Resource Lifecycle Conflict
+        Tracks which clients were successfully closed.
+        Only marks as closed if ALL clients close successfully.
+        
+        Based on RAII pattern and resource management best practices.
+        """
         # Use async lock to prevent concurrent closes
         async with self._close_lock:
             if self._closed:
                 if hasattr(self, 'logger'):
                     self.logger.debug("Price engine already closed")
                 return
-            self._closed = True
+            
+            # Mark as closing (not closed yet)
+            self._closing = True
         
         if hasattr(self, 'logger'):
             self.logger.info("Closing API client sessions...")
+        
+        # Track successful closures
+        closed_clients = set()
+        failed_clients = []
         
         # Safely close clients only if they exist
         clients = getattr(self, 'clients', {})
@@ -108,36 +129,49 @@ class PriceEngine:
             if client:
                 try:
                     await client.close()
+                    closed_clients.add(name)
                     if hasattr(self, 'logger'):
-                        self.logger.debug(f"Closed {name} client session")
+                        self.logger.debug(f"✓ Closed {name} client")
                 except Exception as e:
+                    failed_clients.append((name, e))
                     if hasattr(self, 'logger'):
-                        self.logger.error(f"Error closing {name} client: {e}")
+                        self.logger.error(f"✗ Error closing {name} client: {e}")
         
-        # Close CryptoCompare client if initialized
-        cryptocompare_client = getattr(self, 'cryptocompare_client', None)
-        if cryptocompare_client:
-            try:
-                await cryptocompare_client.close()
-                if hasattr(self, 'logger'):
-                    self.logger.debug("Closed cryptocompare client session")
-            except Exception as e:
-                if hasattr(self, 'logger'):
-                    self.logger.warning(f"Error closing cryptocompare client: {e}")
+        # Close optional clients
+        optional_clients = [
+            ('cryptocompare_client', 'cryptocompare'),
+            ('twelvedata_client', 'twelvedata')
+        ]
         
-        # Close Twelve Data client if initialized
-        twelvedata_client = getattr(self, 'twelvedata_client', None)
-        if twelvedata_client:
-            try:
-                await twelvedata_client.close()
-                if hasattr(self, 'logger'):
-                    self.logger.debug("Closed twelvedata client session")
-            except Exception as e:
-                if hasattr(self, 'logger'):
-                    self.logger.warning(f"Error closing twelvedata client: {e}")
+        for attr_name, display_name in optional_clients:
+            client = getattr(self, attr_name, None)
+            if client:
+                try:
+                    await client.close()
+                    closed_clients.add(display_name)
+                    if hasattr(self, 'logger'):
+                        self.logger.debug(f"✓ Closed {display_name} client")
+                except Exception as e:
+                    failed_clients.append((display_name, e))
+                    if hasattr(self, 'logger'):
+                        self.logger.warning(f"✗ Error closing {display_name} client: {e}")
         
-        if hasattr(self, 'logger'):
-            self.logger.info("Price engine closed")
+        # Update state based on results
+        async with self._close_lock:
+            self._closing = False
+            if failed_clients:
+                # Partial failure - log but mark as closed to prevent retry loops
+                if hasattr(self, 'logger'):
+                    self.logger.warning(
+                        f"Price engine closed with {len(failed_clients)} failures: "
+                        f"{[name for name, _ in failed_clients]}"
+                    )
+                self._closed = True
+            else:
+                # Complete success
+                self._closed = True
+                if hasattr(self, 'logger'):
+                    self.logger.info(f"✅ Price engine closed ({len(closed_clients)} clients)")
     
     async def get_price(self, address: str, chain: str) -> Optional[PriceData]:
         """
@@ -180,6 +214,10 @@ class PriceEngine:
                     self.logger.info(f"Price fetched from {api_name}: ${data.price_usd:.6f}")
                     break  # Got price data, exit loop
                     
+            except asyncio.CancelledError:
+                # System is shutting down - stop immediately
+                self.logger.debug(f"Price fetch cancelled for {address}")
+                raise  # Re-raise to propagate cancellation
             except Exception as e:
                 self.logger.warning(f"{api_name} failed for {address}: {e}")
                 continue
@@ -188,7 +226,7 @@ class PriceEngine:
             self.logger.error(f"All APIs failed for {address} on {chain}")
             return None
         
-        # Enrich missing fields with DexScreener (if not already from DexScreener)
+        # Enrich missing fields with parallel API calls (DexScreener + Blockscout)
         needs_enrichment = (
             (not price_data.symbol or price_data.symbol == 'UNKNOWN') or
             not price_data.market_cap or
@@ -204,47 +242,65 @@ class PriceEngine:
             if not price_data.volume_24h:
                 missing_fields.append('volume_24h')
             
-            self.logger.debug(f"Missing fields from {price_data.source}: {', '.join(missing_fields)}. Trying DexScreener for enrichment")
-            try:
-                await self.rate_limiters['dexscreener'].acquire()
-                dex_data = await self.clients['dexscreener'].get_price(address, chain)
+            self.logger.debug(f"Missing fields from {price_data.source}: {', '.join(missing_fields)}. Trying enrichment APIs in parallel")
+            
+            # Call DexScreener and Blockscout in parallel for faster enrichment
+            enrichment_tasks = []
+            
+            # DexScreener task
+            async def fetch_dexscreener():
+                try:
+                    await self.rate_limiters['dexscreener'].acquire()
+                    return await self.clients['dexscreener'].get_price(address, chain)
+                except Exception as e:
+                    self.logger.debug(f"DexScreener enrichment failed: {e}")
+                    return None
+            
+            enrichment_tasks.append(fetch_dexscreener())
+            
+            # Blockscout task (EVM only)
+            if chain != 'solana':
+                async def fetch_blockscout():
+                    try:
+                        await self.rate_limiters['blockscout'].acquire()
+                        return await self.clients['blockscout'].get_price(address, chain)
+                    except Exception as e:
+                        self.logger.debug(f"Blockscout enrichment failed: {e}")
+                        return None
                 
-                if dex_data:
-                    # Enrich with DexScreener data
-                    if dex_data.symbol and dex_data.symbol != 'UNKNOWN':
-                        price_data.symbol = dex_data.symbol
-                        self.logger.info(f"Enriched symbol from DexScreener: {dex_data.symbol}")
-                    
-                    # Also enrich other missing fields if available
-                    if not price_data.market_cap and dex_data.market_cap:
-                        price_data.market_cap = dex_data.market_cap
-                        self.logger.debug(f"Enriched market_cap from DexScreener: ${dex_data.market_cap:,.0f}")
-                    
-                    if not price_data.volume_24h and dex_data.volume_24h:
-                        price_data.volume_24h = dex_data.volume_24h
-                        self.logger.debug(f"Enriched volume_24h from DexScreener")
-                    
-                    if not price_data.liquidity_usd and dex_data.liquidity_usd:
-                        price_data.liquidity_usd = dex_data.liquidity_usd
-                        self.logger.debug(f"Enriched liquidity from DexScreener")
-                    
-                    if not price_data.pair_created_at and dex_data.pair_created_at:
-                        price_data.pair_created_at = dex_data.pair_created_at
-                        self.logger.debug(f"Enriched pair_created_at from DexScreener")
-                    
-                    # Update source to indicate enrichment
-                    price_data.source = f"{price_data.source}+dexscreener"
-                    
-            except Exception as e:
-                self.logger.debug(f"DexScreener enrichment failed: {e}")
-        
-        # If symbol still missing, try Blockscout as fallback (EVM chains only)
-        if (not price_data.symbol or price_data.symbol == 'UNKNOWN') and chain != 'solana':
-            self.logger.debug(f"Symbol still missing after DexScreener. Trying Blockscout for {address}")
-            try:
-                await self.rate_limiters['blockscout'].acquire()
-                blockscout_data = await self.clients['blockscout'].get_price(address, chain)
+                enrichment_tasks.append(fetch_blockscout())
+            
+            # Execute enrichment calls in parallel
+            enrichment_results = await asyncio.gather(*enrichment_tasks, return_exceptions=True)
+            
+            # Process DexScreener results
+            dex_data = enrichment_results[0] if len(enrichment_results) > 0 and not isinstance(enrichment_results[0], Exception) else None
+            if dex_data:
+                if dex_data.symbol and dex_data.symbol != 'UNKNOWN':
+                    price_data.symbol = dex_data.symbol
+                    self.logger.info(f"Enriched symbol from DexScreener: {dex_data.symbol}")
                 
+                if not price_data.market_cap and dex_data.market_cap:
+                    price_data.market_cap = dex_data.market_cap
+                    self.logger.debug(f"Enriched market_cap from DexScreener: ${dex_data.market_cap:,.0f}")
+                
+                if not price_data.volume_24h and dex_data.volume_24h:
+                    price_data.volume_24h = dex_data.volume_24h
+                    self.logger.debug(f"Enriched volume_24h from DexScreener")
+                
+                if not price_data.liquidity_usd and dex_data.liquidity_usd:
+                    price_data.liquidity_usd = dex_data.liquidity_usd
+                    self.logger.debug(f"Enriched liquidity from DexScreener")
+                
+                if not price_data.pair_created_at and dex_data.pair_created_at:
+                    price_data.pair_created_at = dex_data.pair_created_at
+                    self.logger.debug(f"Enriched pair_created_at from DexScreener")
+                
+                price_data.source = f"{price_data.source}+dexscreener"
+            
+            # Process Blockscout results (if symbol still missing)
+            if (not price_data.symbol or price_data.symbol == 'UNKNOWN') and len(enrichment_results) > 1:
+                blockscout_data = enrichment_results[1] if not isinstance(enrichment_results[1], Exception) else None
                 if blockscout_data and blockscout_data.symbol:
                     price_data.symbol = blockscout_data.symbol
                     self.logger.info(f"Enriched symbol from Blockscout: {blockscout_data.symbol}")
@@ -254,13 +310,22 @@ class PriceEngine:
                         price_data.source = f"{price_data.source}+blockscout"
                     else:
                         price_data.source = f"{price_data.source}+blockscout"
-                        
-            except Exception as e:
-                self.logger.debug(f"Blockscout enrichment failed: {e}")
         
-        # If symbol STILL missing, try GoPlus as final fallback (multi-chain support)
+        # If symbol STILL missing, try reading from blockchain contract (EVM only)
+        if (not price_data.symbol or price_data.symbol == 'UNKNOWN') and chain != 'solana':
+            self.logger.debug(f"Symbol still missing. Trying to read from contract for {address}")
+            try:
+                symbol_from_contract = await self.contract_reader.read_symbol_from_contract(address, chain)
+                if symbol_from_contract:
+                    price_data.symbol = symbol_from_contract
+                    self.logger.info(f"Enriched symbol from contract: {symbol_from_contract}")
+                    price_data.source = f"{price_data.source}+contract"
+            except Exception as e:
+                self.logger.debug(f"Contract symbol read failed: {e}")
+        
+        # If symbol STILL missing, try GoPlus as fallback (multi-chain support)
         if not price_data.symbol or price_data.symbol == 'UNKNOWN':
-            self.logger.debug(f"Symbol still missing after Blockscout. Trying GoPlus for {address}")
+            self.logger.debug(f"Symbol still missing after contract read. Trying GoPlus for {address}")
             try:
                 await self.rate_limiters['goplus'].acquire()
                 goplus_data = await self.clients['goplus'].get_price(address, chain)
@@ -277,6 +342,26 @@ class PriceEngine:
                         
             except Exception as e:
                 self.logger.debug(f"GoPlus enrichment failed: {e}")
+        
+        # If symbol STILL missing, try DefiLlama as final fallback (multi-chain support)
+        if not price_data.symbol or price_data.symbol == 'UNKNOWN':
+            self.logger.debug(f"Symbol still missing after GoPlus. Trying DefiLlama for {address}")
+            try:
+                await self.rate_limiters['defillama'].acquire()
+                defillama_data = await self.clients['defillama'].get_price(address, chain)
+                
+                if defillama_data and defillama_data.symbol:
+                    price_data.symbol = defillama_data.symbol
+                    self.logger.info(f"Enriched symbol from DefiLlama: {defillama_data.symbol}")
+                    
+                    # Update source to indicate DefiLlama enrichment
+                    if '+' in price_data.source:
+                        price_data.source = f"{price_data.source}+defillama"
+                    else:
+                        price_data.source = f"{price_data.source}+defillama"
+                        
+            except Exception as e:
+                self.logger.debug(f"DefiLlama enrichment failed: {e}")
         
         # Fetch ATH data from CoinGecko if not already present (for all tokens, not just CoinGecko-sourced)
         if not price_data.ath:
@@ -460,6 +545,7 @@ class PriceEngine:
         self.logger.debug(f"No historical price available for {symbol} at timestamp {timestamp}")
         return None
     
+
     def _get_api_sequence(self, chain: str) -> list[str]:
         """
         Get API sequence based on chain.
@@ -474,3 +560,46 @@ class PriceEngine:
             return ['birdeye', 'coingecko', 'defillama', 'dexscreener']
         else:  # evm chains
             return ['coingecko', 'moralis', 'defillama', 'dexscreener']
+
+    async def get_prices_batch(self, addresses: list[tuple[str, str]]) -> dict[str, Optional[PriceData]]:
+        """
+        Fetch prices for multiple addresses in parallel for better performance.
+        
+        Args:
+            addresses: List of (address, chain) tuples
+            
+        Returns:
+            Dictionary mapping address to PriceData (or None if failed)
+            
+        Example:
+            addresses = [
+                ("0x123...", "ethereum"),
+                ("0x456...", "ethereum"),
+                ("ABC123...", "solana")
+            ]
+            results = await price_engine.get_prices_batch(addresses)
+        """
+        if not addresses:
+            return {}
+        
+        self.logger.info(f"Fetching {len(addresses)} prices in parallel")
+        
+        # Create tasks for parallel execution
+        tasks = [self.get_price(addr, chain) for addr, chain in addresses]
+        
+        # Execute all price fetches in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Build result dictionary
+        price_map = {}
+        for (addr, chain), result in zip(addresses, results):
+            if isinstance(result, Exception):
+                self.logger.warning(f"Failed to fetch price for {addr}: {result}")
+                price_map[addr] = None
+            else:
+                price_map[addr] = result
+        
+        success_count = sum(1 for v in price_map.values() if v is not None)
+        self.logger.info(f"Batch fetch complete: {success_count}/{len(addresses)} successful")
+        
+        return price_map

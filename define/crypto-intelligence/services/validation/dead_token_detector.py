@@ -86,13 +86,19 @@ class DeadTokenDetector:
             return self.blacklist[address_lower].get('reason', 'Unknown')
         return None
     
-    async def check_and_blacklist_if_dead(self, contract_address: str, chain: str = "ethereum") -> TokenStats:
+    async def check_and_blacklist_if_dead(
+        self, 
+        contract_address: str, 
+        chain: str = "ethereum",
+        has_valid_price: bool = False
+    ) -> TokenStats:
         """
         Check if token is dead and add to blacklist if so.
         
         Args:
             contract_address: Token contract address
             chain: Blockchain name (ethereum, bsc, etc.)
+            has_valid_price: If True, token has valid price data from DEX/API
             
         Returns:
             TokenStats with is_dead flag
@@ -125,7 +131,33 @@ class DeadTokenDetector:
         # Check if token is dead using Etherscan
         stats = await self.etherscan.check_if_dead_token(address_lower, chain_id)
         
-        # If dead, add to blacklist
+        # If dead BUT has valid price data, don't blacklist
+        # (Some tokens like pump.fun have 0 supply but active trading)
+        if stats.is_dead and has_valid_price:
+            self.logger.info(
+                f"[NOT BLACKLISTING] {address_lower[:10]}... has 0 supply but valid price data "
+                f"(likely pump.fun or similar token)"
+            )
+            # Return stats but mark as not dead since it has valid price
+            stats.is_dead = False
+            stats.reason = "Has valid price data despite 0 supply"
+            return stats
+        
+        # IMPORTANT: DON'T blacklist based on supply alone
+        # Many tokens report 0 supply but may still have active trading
+        # Only blacklist if we're certain there's no trading activity (no price data)
+        if stats.is_dead:
+            self.logger.info(
+                f"[NOT BLACKLISTING YET] {address_lower[:10]}... has 0 supply "
+                f"(will verify with price APIs before blacklisting)"
+            )
+            # Mark as potentially dead but don't blacklist yet
+            # Let the price engine determine if it's truly dead
+            stats.is_dead = False
+            stats.reason = "Low supply - needs price verification"
+            return stats
+        
+        # This code path should never be reached now, but keeping for safety
         if stats.is_dead:
             self.blacklist[address_lower] = {
                 'address': address_lower,

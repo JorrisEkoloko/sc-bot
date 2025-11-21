@@ -1,6 +1,15 @@
 """Performance tracking data persistence.
 
 Pure data access layer for loading and saving tracking data.
+
+FIXED: Issue #15 - Async/Sync Boundary Conflicts
+- Removed automatic async/sync detection that creates orphaned tasks
+- Enforces explicit async vs sync method usage
+- Uses AtomicFileWriter for guaranteed data consistency
+
+Based on:
+- PEP 492: Coroutines with async and await syntax
+- ACID properties: Atomic file operations
 """
 import asyncio
 import json
@@ -9,6 +18,8 @@ import threading
 from pathlib import Path
 from typing import Dict, Any, Optional
 from utils.logger import setup_logger
+from utils.atomic_operations import AtomicFileWriter, AtomicFileReader
+from utils.async_helpers import AsyncSyncBoundary
 
 
 class TrackingRepository:
@@ -28,59 +39,37 @@ class TrackingRepository:
         self.tracking_file = self.data_dir / "tracking.json"
         self.logger = logger or setup_logger('TrackingRepository')
         
+        # Use atomic file operations (ACID compliance)
+        self.writer = AtomicFileWriter(self.tracking_file, logger)
+        self.reader = AtomicFileReader(self.tracking_file, logger)
+        
         # Locks for thread-safe operations
         self._async_save_lock = None  # Initialized in async context
         self._sync_save_lock = threading.Lock()
     
     def save(self, tracking_data: Dict[str, Any]) -> None:
         """
-        Save tracking data to JSON file (synchronous).
+        Save tracking data to JSON file (synchronous only).
+        
+        FIXED: Issue #15 - Enforces sync-only context
+        Uses AtomicFileWriter for ACID compliance.
         
         Args:
             tracking_data: Dictionary of tracking data
+            
+        Raises:
+            RuntimeError: If called from async context
         """
-        # Check if we're in an async context
-        try:
-            loop = asyncio.get_running_loop()
-            # We're in async context - warn and schedule async version
-            self.logger.warning("save() called in async context, use save_async() instead")
-            
-            # Create task with error handling
-            task = asyncio.create_task(self.save_async(tracking_data))
-            
-            def handle_save_error(future):
-                try:
-                    future.result()
-                except Exception as e:
-                    self.logger.error(f"Async save failed: {e}")
-            
-            task.add_done_callback(handle_save_error)
-            return
-        except RuntimeError:
-            # No running loop - safe to proceed with sync save
-            pass
+        # Enforce sync context (PEP 492 compliance)
+        AsyncSyncBoundary.require_sync_context("TrackingRepository.save")
         
         # Use threading lock for sync context
         with self._sync_save_lock:
             try:
-                # Write to temporary file first for atomic operation
-                temp_file = self.tracking_file.with_suffix('.tmp')
-                with open(temp_file, 'w', encoding='utf-8') as f:
-                    json.dump(tracking_data, f, indent=2, ensure_ascii=False)
-                    f.flush()
-                    os.fsync(f.fileno())
-                
-                # Atomic rename
-                temp_file.replace(self.tracking_file)
-                self.logger.debug(f"Saved tracking data with {len(tracking_data)} entries")
-            except (IOError, OSError) as e:
-                self.logger.error(f"Failed to save tracking data (I/O error): {e}")
-                raise
-            except json.JSONEncodeError as e:
-                self.logger.error(f"Failed to encode tracking data to JSON: {e}")
-                raise
+                # Use atomic writer (ACID compliance)
+                self.writer.write_json_sync(tracking_data)
             except Exception as e:
-                self.logger.error(f"Unexpected error saving tracking data: {e}")
+                self.logger.error(f"Failed to save tracking data: {e}")
                 raise
     
     async def _ensure_async_lock(self):
@@ -92,6 +81,9 @@ class TrackingRepository:
         """
         Save tracking data to JSON file (async, thread-safe).
         
+        FIXED: Issue #15 - Proper async implementation
+        Uses AtomicFileWriter with executor for non-blocking I/O.
+        
         Args:
             tracking_data: Dictionary of tracking data
         """
@@ -99,49 +91,22 @@ class TrackingRepository:
         
         async with self._async_save_lock:
             try:
-                # Write to temporary file first for atomic operation
-                temp_file = self.tracking_file.with_suffix('.tmp')
-                with open(temp_file, 'w', encoding='utf-8') as f:
-                    json.dump(tracking_data, f, indent=2, ensure_ascii=False)
-                    f.flush()
-                    os.fsync(f.fileno())
-                
-                # Atomic rename
-                temp_file.replace(self.tracking_file)
-                self.logger.debug(f"Saved tracking data with {len(tracking_data)} entries")
-            except (IOError, OSError) as e:
-                self.logger.error(f"Failed to save tracking data (I/O error): {e}")
-                raise
-            except json.JSONEncodeError as e:
-                self.logger.error(f"Failed to encode tracking data to JSON: {e}")
-                raise
+                # Use atomic writer (ACID compliance)
+                await self.writer.write_json(tracking_data)
             except Exception as e:
-                self.logger.error(f"Unexpected error saving tracking data: {e}")
+                self.logger.error(f"Failed to save tracking data: {e}")
                 raise
     
     def load(self) -> Dict[str, Any]:
         """
         Load tracking data from JSON file.
         
+        FIXED: Uses AtomicFileReader for corruption detection.
+        
         Returns:
             Dictionary of tracking data
         """
-        if not self.tracking_file.exists():
-            self.logger.debug("No tracking file found, starting fresh")
-            return {}
-        
-        try:
-            with open(self.tracking_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            self.logger.debug(f"Loaded tracking data with {len(data)} entries")
-            return data
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Corrupted tracking data file: {e}. Starting fresh.")
-            return {}
-        except Exception as e:
-            self.logger.error(f"Failed to load tracking data: {e}")
-            return {}
+        return self.reader.read_json(default={})
     
     def get_file_path(self) -> Path:
         """Get the path to the tracking file."""

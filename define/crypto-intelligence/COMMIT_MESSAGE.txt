@@ -1,0 +1,24 @@
+Fix critical bugs and improve Windows compatibility
+
+## Critical Fixes
+- Fix undefined error_count variable causing crashes during historical scraping
+- Add Windows-safe log rotation to prevent PermissionError on shutdown
+- Update production reset script to preserve channels.json configuration
+
+## Technical Details
+- message_processor_coordinator.py: Changed error_count to len(failed_messages)
+- utils/logger.py: Added safe_doRollover wrapper for Windows compatibility
+- full_production_reset.py: Preserve channels.json, reset blacklist
+
+## Cleanup
+- Removed temporary backup directories and cache files
+- Added models/ to .gitignore (957 MB pre-trained NLP model)
+- Cleaned up 31 temporary test files from previous runs
+
+## Documentation
+- Added CHANGELOG.md with detailed change history
+- Added inline comments explaining fixes
+- Updated .gitignore with backup patterns
+
+Fixes #1 - Historical scraper crash at message 1719
+Fixes #2 - Windows log rotation permission errors

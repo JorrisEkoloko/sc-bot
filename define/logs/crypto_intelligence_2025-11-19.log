@@ -1,0 +1,71 @@
+[2025-11-19 01:00:41] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:00:41] [INFO] [ClearAllData] CLEAR ALL DATA FOR FRESH SCRAPE
+[2025-11-19 01:00:41] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:00:41] [WARNING] [ClearAllData] 
+⚠️  WARNING: This will delete all tracking data!
+[2025-11-19 01:00:41] [WARNING] [ClearAllData] ⚠️  You will lose all historical performance data and reputation scores!
+[2025-11-19 01:05:26] [INFO] [ClearAllData] 
+[2025-11-19 01:05:26] [INFO] [ClearAllData] 1. Clearing CSV output files...
+[2025-11-19 01:05:26] [INFO] [ClearAllData]    📊 Cleared 0 CSV files
+
+[2025-11-19 01:05:26] [INFO] [ClearAllData] 2. Clearing JSON tracking data...
+[2025-11-19 01:05:26] [INFO] [ClearAllData]    📊 Cleared 0 JSON files
+
+[2025-11-19 01:05:26] [INFO] [ClearAllData] 3. Skipping Telegram session files (use --clear-sessions to clear)
+
+[2025-11-19 01:05:26] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:05:26] [INFO] [ClearAllData] ✅ CLEARED 0 FILES
+[2025-11-19 01:05:26] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:02] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:02] [INFO] [ClearAllData] CLEAR ALL DATA FOR FRESH SCRAPE
+[2025-11-19 01:06:02] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:02] [WARNING] [ClearAllData] 
+⚠️  WARNING: This will delete all tracking data!
+[2025-11-19 01:06:02] [WARNING] [ClearAllData] ⚠️  You will lose all historical performance data and reputation scores!
+[2025-11-19 01:06:11] [INFO] [ClearAllData] 
+[2025-11-19 01:06:11] [INFO] [ClearAllData] 1. Clearing CSV output files...
+[2025-11-19 01:06:11] [INFO] [ClearAllData]    📊 Cleared 0 CSV files
+
+[2025-11-19 01:06:11] [INFO] [ClearAllData] 2. Clearing JSON tracking data...
+[2025-11-19 01:06:11] [INFO] [ClearAllData]    📊 Cleared 0 JSON files
+
+[2025-11-19 01:06:11] [INFO] [ClearAllData] 3. Skipping Telegram session files (use --clear-sessions to clear)
+
+[2025-11-19 01:06:11] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:11] [INFO] [ClearAllData] ✅ CLEARED 0 FILES
+[2025-11-19 01:06:11] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:17] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:17] [INFO] [ClearAllData] CLEAR ALL DATA FOR FRESH SCRAPE
+[2025-11-19 01:06:17] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:17] [WARNING] [ClearAllData] 
+⚠️  DRY RUN MODE - No files will be deleted
+
+[2025-11-19 01:06:17] [INFO] [ClearAllData] 1. Clearing CSV output files...
+[2025-11-19 01:06:17] [INFO] [ClearAllData]    📊 Cleared 0 CSV files
+
+[2025-11-19 01:06:17] [INFO] [ClearAllData] 2. Clearing JSON tracking data...
+[2025-11-19 01:06:17] [INFO] [ClearAllData]    📊 Cleared 0 JSON files
+
+[2025-11-19 01:06:17] [INFO] [ClearAllData] 3. Skipping Telegram session files (use --clear-sessions to clear)
+
+[2025-11-19 01:06:17] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:06:17] [INFO] [ClearAllData] DRY RUN: Would delete 0 files
+[2025-11-19 01:06:17] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:07:18] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:07:18] [INFO] [ClearAllData] CLEAR ALL DATA FOR FRESH SCRAPE
+[2025-11-19 01:07:18] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:07:18] [WARNING] [ClearAllData] 
+⚠️  WARNING: This will delete all tracking data!
+[2025-11-19 01:07:18] [WARNING] [ClearAllData] ⚠️  You will lose all historical performance data and reputation scores!
+[2025-11-19 01:07:23] [INFO] [ClearAllData] 
+[2025-11-19 01:07:23] [INFO] [ClearAllData] 1. Clearing CSV output files...
+[2025-11-19 01:07:23] [INFO] [ClearAllData]    📊 Cleared 0 CSV files
+
+[2025-11-19 01:07:23] [INFO] [ClearAllData] 2. Clearing JSON tracking data...
+[2025-11-19 01:07:23] [INFO] [ClearAllData]    📊 Cleared 0 JSON files
+
+[2025-11-19 01:07:23] [INFO] [ClearAllData] 3. Skipping Telegram session files (use --clear-sessions to clear)
+
+[2025-11-19 01:07:23] [INFO] [ClearAllData] ================================================================================
+[2025-11-19 01:07:23] [INFO] [ClearAllData] ✅ CLEARED 0 FILES
+[2025-11-19 01:07:23] [INFO] [ClearAllData] ================================================================================

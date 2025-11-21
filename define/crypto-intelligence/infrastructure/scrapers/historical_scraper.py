@@ -1,28 +1,24 @@
-"""Automatic historical scraper for new channels."""
-import json
+"""Automatic historical scraper for new channels (refactored)."""
 import asyncio
-from pathlib import Path
-from typing import Optional, Callable
-from datetime import datetime
-from enum import Enum
+from typing import Callable
 
 from config.historical_scraper_config import HistoricalScraperConfig
 from infrastructure.telegram.telegram_monitor import TelegramMonitor
-from domain.message_event import MessageEvent
+from infrastructure.scrapers.scraping_progress_tracker import ScrapingProgressTracker, ScrapingStatus
+from infrastructure.scrapers.message_fetcher import MessageFetcher
+from infrastructure.scrapers.message_processor_coordinator import MessageProcessorCoordinator
 from utils.logger import setup_logger
 
 
-class ScrapingStatus(Enum):
-    """Status of channel scraping."""
-    PENDING = "pending"
-    COMPLETED = "completed"
-    EMPTY = "empty"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
 class HistoricalScraper:
-    """Automatic historical scraping for new channels on startup."""
+    """
+    Automatic historical scraping for new channels on startup.
+    
+    Refactored to use specialized components:
+    - ScrapingProgressTracker: Manages scraping status
+    - MessageFetcher: Fetches messages from Telegram
+    - MessageProcessorCoordinator: Processes messages through pipeline
+    """
     
     def __init__(
         self,
@@ -39,87 +35,31 @@ class HistoricalScraper:
             message_handler: Async function to handle each message
         """
         self.config = config
-        self.telegram_monitor = telegram_monitor
-        self.message_handler = message_handler
         self.logger = setup_logger('HistoricalScraper')
         
-        self.scraped_channels_file = Path(config.scraped_channels_file)
-        self.scraped_channels = self._load_scraped_channels()
+        # Initialize specialized components
+        self.progress_tracker = ScrapingProgressTracker(
+            scraped_channels_file=config.scraped_channels_file,
+            logger=self.logger
+        )
+        
+        self.message_fetcher = MessageFetcher(
+            telegram_monitor=telegram_monitor,
+            logger=self.logger
+        )
+        
+        self.message_processor = MessageProcessorCoordinator(
+            message_handler=message_handler,
+            rate_limit_delay=0.5,  # 0.5s between messages
+            logger=self.logger
+        )
         
         self.logger.info(
-            f"Historical scraper initialized "
+            f"Historical scraper initialized with refactored architecture "
             f"(enabled: {config.enabled}, limit: {config.message_limit})"
         )
     
-    def _load_scraped_channels(self) -> set:
-        """
-        Load list of previously scraped channels.
-        
-        Returns:
-            Set of channel IDs that have been successfully scraped
-        """
-        if not self.scraped_channels_file.exists():
-            self.logger.info("No scraped channels file found, starting fresh")
-            return set()
-        
-        try:
-            with open(self.scraped_channels_file, 'r') as f:
-                data = json.load(f)
-                # Load channels with completed or empty status
-                channels_data = data.get('channels', {})
-                completed_channels = {
-                    channel_id for channel_id, info in channels_data.items()
-                    if info.get('status') in [ScrapingStatus.COMPLETED.value, ScrapingStatus.EMPTY.value]
-                }
-                self.logger.info(f"Loaded {len(completed_channels)} previously scraped channels")
-                return completed_channels
-        except Exception as e:
-            self.logger.error(f"Error loading scraped channels: {e}")
-            return set()
-    
-    def _save_channel_status(self, channel_id: str, status: ScrapingStatus, 
-                            message_count: int = 0, error: Optional[str] = None):
-        """
-        Save channel scraping status to disk.
-        
-        Args:
-            channel_id: Channel ID
-            status: Scraping status
-            message_count: Number of messages processed
-            error: Error message if failed
-        """
-        try:
-            # Create directory if needed
-            self.scraped_channels_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Load existing data
-            channels_data = {}
-            if self.scraped_channels_file.exists():
-                try:
-                    with open(self.scraped_channels_file, 'r') as f:
-                        existing = json.load(f)
-                        channels_data = existing.get('channels', {})
-                except Exception:
-                    pass
-            
-            # Update channel status
-            channels_data[channel_id] = {
-                'status': status.value,
-                'last_attempt': datetime.now().isoformat(),
-                'message_count': message_count,
-                'error': error
-            }
-            
-            # Save to file
-            with open(self.scraped_channels_file, 'w') as f:
-                json.dump({
-                    'channels': channels_data,
-                    'last_updated': datetime.now().isoformat()
-                }, f, indent=2)
-            
-            self.logger.debug(f"Saved status for channel {channel_id}: {status.value}")
-        except Exception as e:
-            self.logger.error(f"Error saving channel status: {e}")
+
     
     async def scrape_if_needed(self, channel_config) -> bool:
         """
@@ -139,7 +79,7 @@ class HistoricalScraper:
         channel_name = channel_config.name
         
         # Check if already scraped
-        if channel_id in self.scraped_channels:
+        if self.progress_tracker.is_channel_scraped(channel_id):
             self.logger.info(f"Channel {channel_name} already scraped, skipping")
             return True
         
@@ -149,27 +89,35 @@ class HistoricalScraper:
         )
         
         try:
-            # Fetch historical messages
-            messages = await self._fetch_messages(channel_id, self.config.message_limit)
+            # Fetch historical messages using MessageFetcher
+            messages = await self.message_fetcher.fetch_messages(
+                channel_id,
+                self.config.message_limit
+            )
             
             if not messages:
                 # Check if channel is accessible but empty vs fetch failed
-                is_accessible = await self._is_channel_accessible(channel_id)
+                is_accessible = await self.message_fetcher.is_channel_accessible(channel_id)
                 if is_accessible:
                     self.logger.info(f"Channel {channel_name} is empty, marking as scraped")
-                    self.scraped_channels.add(channel_id)
-                    self._save_channel_status(channel_id, ScrapingStatus.EMPTY, 0)
+                    self.progress_tracker.mark_channel_completed(channel_id, 0)
                 else:
                     self.logger.warning(f"Channel {channel_name} may be inaccessible, will retry next startup")
-                    self._save_channel_status(channel_id, ScrapingStatus.FAILED, 0, "Channel inaccessible or no messages")
+                    self.progress_tracker.mark_channel_failed(channel_id, "Channel inaccessible or no messages")
                 return True
             
-            # Process messages (may raise CancelledError)
-            message_count = await self._process_messages(messages, channel_name)
+            # Process messages using MessageProcessorCoordinator (may raise CancelledError)
+            result = await self.message_processor.process_messages(
+                messages,
+                channel_name,
+                channel_id
+            )
+            
+            # Extract message count from result dict
+            message_count = result['processed'] if isinstance(result, dict) else result
             
             # Mark as scraped if processing completed successfully
-            self.scraped_channels.add(channel_id)
-            self._save_channel_status(channel_id, ScrapingStatus.COMPLETED, message_count)
+            self.progress_tracker.mark_channel_completed(channel_id, message_count)
             
             self.logger.info(f"Historical scraping complete for {channel_name}: {message_count} messages")
             return True
@@ -177,14 +125,19 @@ class HistoricalScraper:
         except asyncio.CancelledError:
             # Don't mark as scraped if cancelled - allow retry on next startup
             self.logger.info(f"Historical scraping cancelled for {channel_name}, will retry on next startup")
-            self._save_channel_status(channel_id, ScrapingStatus.CANCELLED, 0, "Scraping cancelled")
+            self.progress_tracker.save_channel_status(channel_id, ScrapingStatus.CANCELLED, 0, "Scraping cancelled")
             raise  # Propagate cancellation
         except Exception as e:
             self.logger.error(f"Historical scraping failed for {channel_name}: {e}")
-            self._save_channel_status(channel_id, ScrapingStatus.FAILED, 0, str(e))
+            self.progress_tracker.mark_channel_failed(channel_id, str(e))
             return False
     
-    async def _is_channel_accessible(self, channel_id: str) -> bool:
+    # Old methods removed - now handled by specialized components:
+    # - ScrapingProgressTracker: Manages scraping status
+    # - MessageFetcher: Fetches messages from Telegram
+    # - MessageProcessorCoordinator: Processes messages through pipeline
+    
+    async def _is_channel_accessible_DEPRECATED(self, channel_id: str) -> bool:
         """
         Check if channel is accessible.
         
@@ -215,13 +168,22 @@ class HistoricalScraper:
         messages = []
         
         try:
+            # Ensure client is connected
+            if not self.telegram_monitor.client.is_connected():
+                self.logger.warning("Client not connected, attempting to connect...")
+                await self.telegram_monitor.client.connect()
+            
             # Get the channel entity
             channel = await self.telegram_monitor.client.get_entity(channel_id)
+            self.logger.info(f"Got channel entity: {channel.title} (ID: {channel.id})")
             
-            # Fetch messages
+            # Fetch messages (limit=0 means unlimited, but use None for iter_messages)
+            fetch_limit = None if limit == 0 else limit
+            self.logger.info(f"Fetching messages with limit: {fetch_limit}")
+            
             async for message in self.telegram_monitor.client.iter_messages(
                 channel,
-                limit=limit
+                limit=fetch_limit
             ):
                 if message.text:  # Only process text messages
                     messages.append(message)
@@ -230,7 +192,7 @@ class HistoricalScraper:
             return messages
             
         except Exception as e:
-            self.logger.error(f"Error fetching messages: {e}")
+            self.logger.error(f"Error fetching messages: {e}", exc_info=True)
             return []
     
     async def _process_messages(self, messages: list, channel_name: str) -> int:
@@ -256,26 +218,39 @@ class HistoricalScraper:
                 
                 # Create message event
                 event = MessageEvent(
-                    channel_name=channel_name,
-                    message_text=message.text,
-                    timestamp=message.date,
-                    message_id=message.id,
-                    message_obj=message,
                     channel_id=str(message.peer_id.channel_id) 
                         if hasattr(message, 'peer_id') and hasattr(message.peer_id, 'channel_id') else "",
-                    sender_id=str(message.sender_id) if hasattr(message, 'sender_id') else ""
+                    channel_name=channel_name,
+                    message_id=message.id,
+                    message_text=message.text,
+                    timestamp=message.date,
+                    sender_id=message.sender_id if hasattr(message, 'sender_id') else None,
+                    message_obj=message
                 )
                 
                 # Process with timeout to prevent hanging
                 try:
                     await asyncio.wait_for(
                         self.message_handler(event),
-                        timeout=30.0  # 30 second timeout per message
+                        timeout=60.0  # 60 second timeout per message (increased for NLP model loading + API calls)
                     )
                     processed_count += 1
+                except asyncio.CancelledError:
+                    # System is shutting down - stop processing immediately
+                    self.logger.info(f"Message processing cancelled at message {message.id}, stopping scrape")
+                    raise  # Re-raise to stop the scrape
                 except asyncio.TimeoutError:
-                    self.logger.error(f"Message {message.id} processing timed out after 30s")
-                    # Continue with next message
+                    self.logger.warning(f"⏱️  Message {message.id} timed out - adding to retry queue")
+                    # Add to retry queue instead of skipping
+                    if not hasattr(self, '_retry_queue'):
+                        self._retry_queue = []
+                    self._retry_queue.append(message)
+                except Exception as msg_error:
+                    self.logger.error(f"❌ Message {message.id} failed: {msg_error}")
+                    # Add failed messages to retry queue too
+                    if not hasattr(self, '_retry_queue'):
+                        self._retry_queue = []
+                    self._retry_queue.append(message)
                 
             except asyncio.CancelledError:
                 # Log cancellation at point of detection and propagate immediately
@@ -284,6 +259,60 @@ class HistoricalScraper:
             except Exception as e:
                 self.logger.error(f"Error processing message {message.id}: {e}")
                 # Continue processing other messages
+        
+        self.logger.info(f"Completed first pass: {processed_count}/{total} messages processed")
+        
+        # Retry failed/timed-out messages
+        if hasattr(self, '_retry_queue') and self._retry_queue:
+            retry_count = len(self._retry_queue)
+            self.logger.info(f"🔄 Retrying {retry_count} failed/timed-out messages...")
+            
+            retry_success = 0
+            max_retries = 1  # Only retry once to avoid infinite loops
+            
+            for retry_attempt in range(max_retries):
+                if not self._retry_queue:
+                    break
+                
+                # Take messages from retry queue
+                messages_to_retry = self._retry_queue.copy()
+                self._retry_queue.clear()
+                
+                self.logger.info(f"Retry attempt {retry_attempt + 1}/{max_retries}: {len(messages_to_retry)} messages")
+                
+                for message in messages_to_retry:
+                    try:
+                        event = MessageEvent(
+                            channel_id=str(message.peer_id.channel_id) 
+                                if hasattr(message, 'peer_id') and hasattr(message.peer_id, 'channel_id') else "",
+                            channel_name=channel_name,
+                            message_id=message.id,
+                            message_text=message.text or "",
+                            timestamp=message.date,
+                            sender_id=message.sender_id if hasattr(message, 'sender_id') else None,
+                            message_obj=message
+                        )
+                        
+                        # Retry with same timeout
+                        await asyncio.wait_for(
+                            self.message_handler(event),
+                            timeout=60.0
+                        )
+                        retry_success += 1
+                        self.logger.info(f"✅ Retry successful for message {message.id}")
+                        
+                    except asyncio.TimeoutError:
+                        self.logger.warning(f"⏱️  Message {message.id} timed out again on retry")
+                        # Don't add back to queue - give up after max retries
+                    except Exception as e:
+                        self.logger.error(f"❌ Message {message.id} failed again on retry: {e}")
+            
+            if retry_success > 0:
+                self.logger.info(f"✅ Successfully retried {retry_success}/{retry_count} messages")
+                processed_count += retry_success
+            
+            if self._retry_queue:
+                self.logger.warning(f"⚠️  {len(self._retry_queue)} messages still failed after retries")
         
         self.logger.info(f"Completed processing {processed_count}/{total} historical messages")
         return processed_count

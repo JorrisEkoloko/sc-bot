@@ -168,8 +168,7 @@ class TelegramMonitor:
         # Ensure locks are initialized
         await self._ensure_locks_initialized()
         
-        # Protect against concurrent start_monitoring calls
-        monitoring_started = False
+        # Atomic state transition with lock protection
         async with self._monitoring_lock:
             # Re-check connection state after acquiring lock
             if not self.connected:
@@ -183,18 +182,14 @@ class TelegramMonitor:
             self.message_callback = message_callback
             self._callback_failure_count = 0  # Reset failure counter
             self._monitoring_active = True  # Set inside lock
-            monitoring_started = True
         
-        # Use try-finally to ensure flag is reset if monitoring fails to start
+        # Use try-finally to ensure proper cleanup
         try:
-            pass  # monitoring_active already set inside lock
             
             # Define event handler with separated error zones
             async def handle_new_message(event):
                 """Handle new message event."""
-                msg_event = None
-                
-                # Phase 1: Extract message data
+                # Phase 1: Extract message data (fail fast on extraction errors)
                 try:
                     # Get channel info
                     chat = await event.get_chat()
@@ -227,14 +222,31 @@ class TelegramMonitor:
                     # Track consecutive extraction failures
                     self._extraction_failure_count += 1
                     
+                    # Use exponential backoff instead of hard stop
                     if self._extraction_failure_count >= 10:
-                        self.logger.critical("Too many consecutive extraction failures (10+), stopping monitoring")
-                        raise RuntimeError(f"Message extraction failed 10 consecutive times, last error: {e}") from e
+                        backoff_time = min(2 ** (self._extraction_failure_count - 10), 60)
+                        self.logger.warning(
+                            f"High extraction failure rate ({self._extraction_failure_count} consecutive), "
+                            f"backing off {backoff_time}s"
+                        )
+                        await asyncio.sleep(backoff_time)
                     
-                    # Don't return - let it fall through to allow callback error tracking
+                    # Only stop after persistent failures (20+)
+                    if self._extraction_failure_count >= 20:
+                        self.logger.critical(
+                            f"Persistent extraction failures ({self._extraction_failure_count}), "
+                            f"stopping monitoring"
+                        )
+                        raise RuntimeError(
+                            f"Message extraction failed {self._extraction_failure_count} consecutive times, "
+                            f"last error: {e}"
+                        ) from e
+                    
+                    # Explicit early return on extraction failure (prevents shadowing)
+                    return
                 
-                # Phase 2: Call the callback only if extraction succeeded
-                if msg_event and self.message_callback:
+                # Phase 2: Call the callback (only reached if extraction succeeded)
+                if self.message_callback:
                     try:
                         await self.message_callback(msg_event)
                         # Reset failure count on success
@@ -278,32 +290,69 @@ class TelegramMonitor:
                 await self.client.run_until_disconnected()
             except asyncio.CancelledError:
                 self.logger.info("Monitoring cancelled, shutting down...")
+            except RuntimeError as e:
+                # Handle event loop closure errors from Telethon
+                if "event loop" in str(e).lower():
+                    self.logger.warning(f"Event loop closed during monitoring: {e}")
+                    self.connected = False
+                else:
+                    self.logger.error(f"Monitoring loop error: {e}", exc_info=True)
             except Exception as e:
                 self.logger.error(f"Monitoring loop error: {e}", exc_info=True)
         finally:
-            # Unregister event handler to prevent memory leaks
-            if self._event_handler:
+            # Atomic state reset with lock protection
+            async with self._monitoring_lock:
+                self._monitoring_active = False
+                handler_to_remove = self._event_handler
+                self._event_handler = None
+            
+            # Check if event loop is still running before attempting async cleanup
+            try:
+                loop = asyncio.get_running_loop()
+                loop_running = True
+            except RuntimeError:
+                # No event loop running - skip async cleanup
+                loop_running = False
+                self.logger.warning("Event loop not running, skipping async cleanup")
+            
+            # Attempt cleanup (only if event loop is available)
+            if handler_to_remove and loop_running:
                 try:
-                    self.client.remove_event_handler(self._event_handler)
+                    self.client.remove_event_handler(handler_to_remove)
                     self.logger.debug("Event handler removed successfully")
                 except Exception as e:
-                    self.logger.critical(f"Handler removal failed: {e} - forcing disconnect to clear handlers")
-                    # Force client disconnect to clear all handlers
+                    self.logger.critical(f"Handler removal failed: {e} - forcing client reset")
+                    # Force full client reset to clear all handlers
                     try:
                         await self.client.disconnect()
                         self.connected = False
                         self.logger.info("Forced disconnect to clear zombie handlers")
-                    except Exception as disconnect_error:
-                        self.logger.error(f"Forced disconnect also failed: {disconnect_error}")
-                finally:
-                    # Always clear handler reference and mark inactive
-                    self._event_handler = None
-                    self._monitoring_active = False
-            else:
-                self._monitoring_active = False
+                        # Attempt reconnect to get clean state
+                        reconnect_success = await self.connect()
+                        if reconnect_success:
+                            self.logger.info("Client reconnected successfully with clean state")
+                        else:
+                            self.logger.error("Client reconnection failed - manual restart required")
+                    except Exception as reset_error:
+                        self.logger.error(f"Client reset failed: {reset_error}")
+                        # Mark as disconnected to force full restart on next start_monitoring
+                        self.connected = False
+            elif handler_to_remove and not loop_running:
+                # Event loop closed - just mark as disconnected
+                self.logger.warning("Cannot remove handler - event loop closed, marking as disconnected")
+                self.connected = False
     
     async def disconnect(self):
         """Disconnect from Telegram."""
+        # Check if event loop is still running
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop - just mark as disconnected
+            self.logger.warning("Event loop not running, marking as disconnected without cleanup")
+            self.connected = False
+            return
+        
         # Ensure locks are initialized
         await self._ensure_locks_initialized()
         
@@ -317,6 +366,15 @@ class TelegramMonitor:
                 # Only set disconnected after successful disconnect
                 self.connected = False
                 self.logger.info("Disconnected successfully")
+            except RuntimeError as e:
+                # Check if it's an event loop error
+                if "event loop" in str(e).lower():
+                    self.logger.warning(f"Event loop error during disconnect: {e}")
+                    self.connected = False
+                else:
+                    self.logger.error(f"Error during disconnect: {e}")
+                    self.connected = False
+                    raise
             except Exception as e:
                 self.logger.error(f"Error during disconnect: {e}")
                 # Force disconnected state even on error to prevent retry loops

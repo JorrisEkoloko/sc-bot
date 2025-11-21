@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from utils.logger import setup_logger
+from utils.key_normalizer import KeyNormalizer
 
 
 class CSVTableWriter:
@@ -78,19 +79,26 @@ class CSVTableWriter:
             if not rows:
                 rows = [self.columns]
             
+            # Normalize key for comparison using KeyNormalizer
+            normalized_key = KeyNormalizer.normalize_key_by_column(key, 0, self.table_name)
+            
             # Find row with matching key (first column)
             updated = False
             for i, existing_row in enumerate(rows[1:], start=1):  # Skip header
-                if existing_row and existing_row[0] == key:
-                    rows[i] = row
-                    updated = True
-                    self.logger.debug(f"Updated existing row in {self.table_name} (key: {key[:10]}...)")
-                    break
+                if existing_row:
+                    # Normalize existing key for comparison using KeyNormalizer
+                    existing_key = KeyNormalizer.normalize_key_by_column(existing_row[0], 0, self.table_name)
+                    
+                    if existing_key == normalized_key:
+                        rows[i] = row
+                        updated = True
+                        self.logger.debug(f"Updated existing row in {self.table_name} (key: {normalized_key[:10]}...)")
+                        break
             
             # If not found, append
             if not updated:
                 rows.append(row)
-                self.logger.debug(f"Inserted new row in {self.table_name} (key: {key[:10]}...)")
+                self.logger.debug(f"Inserted new row in {self.table_name} (key: {normalized_key[:10]}...)")
             
             # Write all rows back
             with open(self.current_file, 'w', newline='', encoding='utf-8') as f:
@@ -99,6 +107,75 @@ class CSVTableWriter:
                 
         except Exception as e:
             self.logger.error(f"Failed to update/insert row in {self.table_name}: {e}")
+            # Don't re-raise - allow system to continue with other operations
+    
+    def update_or_insert_composite(self, key_values: list, row: list, key_column_indices: list = None):
+        """
+        Update existing row or insert new row using composite key.
+        
+        The key_values are matched against specified columns or the first N columns.
+        
+        Args:
+            key_values: List of values for composite key (e.g., [address, symbol, message_id])
+            row: List of values matching column order
+            key_column_indices: Optional list of column indices to use as key (e.g., [0, 2, 3])
+                               If None, uses first N columns sequentially
+        """
+        try:
+            self._ensure_file()
+            
+            # Read all rows
+            rows = []
+            if self.current_file.exists():
+                with open(self.current_file, 'r', newline='', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)
+            
+            # If file is empty or only has header, add header
+            if not rows:
+                rows = [self.columns]
+            
+            # Determine which columns to use for key matching
+            if key_column_indices is None:
+                # Default: use first N columns sequentially
+                key_column_indices = list(range(len(key_values)))
+            
+            # Normalize key values for comparison using KeyNormalizer
+            normalized_key_values = KeyNormalizer.normalize_composite_key(
+                key_values, key_column_indices, self.table_name
+            )
+            
+            # Find row with matching composite key
+            updated = False
+            for i, existing_row in enumerate(rows[1:], start=1):  # Skip header
+                if existing_row and len(existing_row) > max(key_column_indices):
+                    # Extract and normalize key values from existing row using KeyNormalizer
+                    existing_key_raw = [existing_row[col_idx] for col_idx in key_column_indices]
+                    existing_key_values = KeyNormalizer.normalize_composite_key(
+                        existing_key_raw, key_column_indices, self.table_name
+                    )
+                    
+                    # Check if all key columns match
+                    if existing_key_values == normalized_key_values:
+                        rows[i] = row
+                        updated = True
+                        key_str = '|'.join(str(k)[:10] for k in key_values)
+                        self.logger.debug(f"Updated existing row in {self.table_name} (key: {key_str}...)")
+                        break
+            
+            # If not found, append
+            if not updated:
+                rows.append(row)
+                key_str = '|'.join(str(k)[:10] for k in key_values)
+                self.logger.debug(f"Inserted new row in {self.table_name} (key: {key_str}...)")
+            
+            # Write all rows back
+            with open(self.current_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerows(rows)
+                
+        except Exception as e:
+            self.logger.error(f"Failed to update/insert row with composite key in {self.table_name}: {e}")
             # Don't re-raise - allow system to continue with other operations
     
     def _ensure_file(self):

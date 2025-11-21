@@ -1,0 +1,6 @@
+address,chain,first_message_id,start_price,start_time,ath_since_mention,ath_time,ath_multiplier,current_multiplier,days_tracked,days_to_ath,peak_timing,day_7_price,day_7_multiplier,day_7_classification,day_30_price,day_30_multiplier,day_30_classification,trajectory
+'0x1234567890123456789012345678901234567890,ethereum,msg_0,0.001,2025-11-18T15:37:17.024710+00:00,0.01,2025-11-18T15:37:17.024724+00:00,10.0,5.0,7,3.5,fast,0.005,5.0,winner,,,,rising
+'0x0000000000000000000000000000000000000001,ethereum,msg_1,0.001,2025-11-18T15:37:17.033461+00:00,0.01,2025-11-18T15:37:17.033477+00:00,10.0,5.0,7,3.5,fast,0.005,5.0,winner,,,,rising
+'0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE,ethereum,msg_2,0.001,2025-11-18T15:37:17.042510+00:00,0.01,2025-11-18T15:37:17.042521+00:00,10.0,5.0,7,3.5,fast,0.005,5.0,winner,,,,rising
+'9999999999999999999999999999999999999999,ethereum,msg_3,0.001,2025-11-18T15:37:17.050657+00:00,0.01,2025-11-18T15:37:17.050666+00:00,10.0,5.0,7,3.5,fast,0.005,5.0,winner,,,,rising
+'1111111111111111111111111111111111111111,ethereum,msg_4,0.001,2025-11-18T15:37:17.060767+00:00,0.01,2025-11-18T15:37:17.060781+00:00,10.0,5.0,7,3.5,fast,0.005,5.0,winner,,,,rising

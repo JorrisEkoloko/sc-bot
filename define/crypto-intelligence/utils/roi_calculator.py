@@ -39,8 +39,9 @@ class ROICalculator:
             >>> ROICalculator.calculate_roi(1.47, 4.78)
             (225.17, 3.252)
         """
-        if entry_price <= 0:
-            return (0.0, 0.0)
+        # Handle edge cases to prevent division by zero
+        if entry_price <= 0 or current_price <= 0:
+            return (0.0, 1.0)  # No movement if prices are invalid
         
         roi_percentage = ((current_price - entry_price) / entry_price) * 100
         roi_multiplier = current_price / entry_price

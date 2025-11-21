@@ -252,16 +252,78 @@ class CoinGeckoClient(BaseAPIClient):
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
+        """
+        Async context manager exit with proper exception handling.
+        
+        FIXED: Issue #16 - Context Manager Interference
+        Properly chains exceptions instead of losing close errors.
+        
+        Based on PEP 343: Context manager exception handling.
+        """
+        close_error = None
+        
         try:
             await self.close()
-        except Exception as close_error:
-            # Log but don't shadow original exception
-            if exc_type is None:
-                # No original exception, re-raise close error
-                raise
-            else:
-                # Original exception exists, log close error but don't shadow
-                self.logger.error(f"Error during context manager cleanup: {close_error}")
-                # Return False to propagate original exception
-                return False
+        except Exception as e:
+            close_error = e
+            self.logger.error(f"Error during context manager cleanup: {e}")
+        
+        # Handle exception chaining
+        if exc_type is not None and close_error is not None:
+            # Chain close error to original exception
+            if hasattr(exc_val, '__context__'):
+                exc_val.__context__ = close_error
+            self.logger.error(
+                f"Multiple errors: original={exc_type.__name__}, "
+                f"cleanup={type(close_error).__name__}"
+            )
+            return False  # Propagate original exception with context
+        
+        # If only close error, raise it
+        if close_error is not None:
+            raise close_error
+        
+        # If only original error, propagate it
+        return False
+
+    async def get_coins_list(self, include_platform: bool = True) -> list:
+        """
+        Fetch list of all coins with their contract addresses.
+        
+        Args:
+            include_platform: Include platform/contract address data
+            
+        Returns:
+            List of coin dictionaries with id, symbol, name, and platforms
+        """
+        await self._ensure_session()
+        
+        # Determine if demo or pro key
+        is_demo = self.api_key.startswith('CG-')
+        base_url = "https://api.coingecko.com" if is_demo else "https://pro-api.coingecko.com"
+        
+        url = f"{base_url}/api/v3/coins/list"
+        params = {
+            'include_platform': 'true' if include_platform else 'false'
+        }
+        
+        # Use appropriate header based on key type
+        headers = {
+            'x-cg-demo-api-key' if is_demo else 'x-cg-pro-api-key': self.api_key
+        }
+        
+        try:
+            async with self._session.get(url, params=params, headers=headers, timeout=30) as response:
+                self.logger.debug(f"CoinGecko coins list response status: {response.status}")
+                
+                if response.status == 200:
+                    data = await response.json()
+                    self.logger.info(f"CoinGecko returned {len(data)} coins")
+                    return data
+                else:
+                    response_text = await response.text()
+                    self.logger.warning(f"CoinGecko coins list HTTP {response.status}: {response_text[:200]}")
+                    return []
+        except Exception as e:
+            self.logger.error(f"CoinGecko coins list exception: {e}")
+            return []

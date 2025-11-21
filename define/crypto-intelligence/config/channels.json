@@ -1,6 +1,51 @@
 {
   "channels": [
     {
+      "id": "@kobesgambles",
+      "name": "Kobes Gambles",
+      "enabled": true
+    },
+    {
+      "id": "@binancesignals",
+      "name": "Binance Signals",
+      "enabled": false
+    },
+    {
+      "id": "@CryptoSignalsAdvice",
+      "name": "Crypto Signals Advice",
+      "enabled": false
+    },
+    {
+      "id": "@CryptoVIPSignal",
+      "name": "Crypto VIP Signal",
+      "enabled": false
+    },
+    {
+      "id": "@ICODrops",
+      "name": "ICO Drops",
+      "enabled": false
+    },
+    {
+      "id": "@CryptoInnerCircle",
+      "name": "Crypto Inner Circle",
+      "enabled": false
+    },
+    {
+      "id": "@whale_alert",
+      "name": "Whale Alert",
+      "enabled": false
+    },
+    {
+      "id": "@glassnode",
+      "name": "Glassnode",
+      "enabled": false
+    },
+    {
+      "id": "@DeFiPulse",
+      "name": "DeFi Pulse",
+      "enabled": false
+    },
+    {
       "id": "@erics_calls",
       "name": "Eric Cryptomans Journal",
       "enabled": true
